@@ -29,7 +29,7 @@ public class HmsBackendApplication {
             Database: PostgreSQL 16.6
             Java Version: 21 LTS
             Spring Boot: 3.4.1
-            Timezone: Asia/Jakarta
+            Timezone: Asia/Makassar
             Locale: id_ID
             ========================================
             Application is running successfully!

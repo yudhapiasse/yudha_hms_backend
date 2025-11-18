@@ -54,7 +54,7 @@ spring:
       max-request-size: 10MB
 
   jackson:
-    time-zone: Asia/Jakarta
+    time-zone: Asia/Makassar
     locale: id_ID
     serialization:
       write-dates-as-timestamps: false
@@ -65,7 +65,7 @@ hms:
   app:
     version: 1.0.0
     locale: id_ID
-    timezone: Asia/Jakarta
+    timezone: Asia/Makassar
 
   medical-record:
     number-format: "YYYYMM-XXXXX"
