@@ -1,0 +1,117 @@
+spring:
+  application:
+    name: hms-backend
+
+  profiles:
+    active: dev
+
+  jpa:
+    open-in-view: false
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+        use_sql_comments: true
+        default_schema: public
+        jdbc:
+          batch_size: 20
+          fetch_size: 50
+        order_inserts: true
+        order_updates: true
+    hibernate:
+      ddl-auto: validate
+
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: HMSHikariPool
+
+  # Flyway Database Migration
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    schemas: public
+    validate-on-migrate: true
+    out-of-order: false
+    placeholder-replacement: true
+    placeholders:
+      schemaPrefix: ""
+
+  # Enable Virtual Threads (Java 21)
+  threads:
+    virtual:
+      enabled: true
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  jackson:
+    time-zone: Asia/Jakarta
+    locale: id_ID
+    serialization:
+      write-dates-as-timestamps: false
+      indent-output: false
+
+# Application specific settings
+hms:
+  app:
+    version: 1.0.0
+    locale: id_ID
+    timezone: Asia/Jakarta
+
+  medical-record:
+    number-format: "YYYYMM-XXXXX"
+    number-prefix: "HMS"
+
+  security:
+    jwt:
+      secret: ${JWT_SECRET:changeme-in-production-use-strong-secret-key}
+      expiration: 86400000 # 24 hours in milliseconds
+      refresh-expiration: 604800000 # 7 days in milliseconds
+
+# Logging configuration
+logging:
+  level:
+    root: INFO
+    com.yudha.hms: DEBUG
+    org.springframework.web: INFO
+    org.springframework.security: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Management endpoints
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Server configuration
+server:
+  port: 8080
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+  error:
+    include-message: always
+    include-binding-errors: always
+    include-stacktrace: on_param
+    include-exception: false

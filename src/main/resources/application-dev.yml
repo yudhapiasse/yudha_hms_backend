@@ -1,0 +1,46 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hms_dev
+    username: hms_user
+    password: hms_password
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: validate # Use 'validate' to work with Flyway
+
+  flyway:
+    enabled: true
+    clean-disabled: false # Allow clean in development (CAUTION: removes all data!)
+    baseline-on-migrate: true
+
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+logging:
+  level:
+    root: INFO
+    com.yudha.hms: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+    org.flywaydb: DEBUG # Flyway migration logging
+  file:
+    name: logs/hms-dev.log
+
+server:
+  port: 8080
+  error:
+    include-stacktrace: always
+
+# Development-specific settings
+hms:
+  security:
+    jwt:
+      secret: dev-secret-key-change-in-production-this-is-not-secure
+      expiration: 86400000 # 24 hours

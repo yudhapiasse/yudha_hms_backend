@@ -1,0 +1,106 @@
+hms-backend/
+│
+├── pom.xml                                    # Maven build configuration
+├── README.md                                  # Project documentation
+├── SETUP.md                                   # Setup instructions
+├── MODULE_GUIDE.md                            # Modular architecture guide
+├── .gitignore                                 # Git ignore rules
+│
+├── src/
+│   ├── main/
+│   │   ├── java/com/yudha/hms/
+│   │   │   │
+│   │   │   ├── HmsBackendApplication.java    # Main Spring Boot application
+│   │   │   │
+│   │   │   ├── patient/                      # Patient Management Module
+│   │   │   │   ├── package-info.java         # Module documentation
+│   │   │   │   ├── controller/               # REST API endpoints
+│   │   │   │   ├── service/                  # Business logic
+│   │   │   │   ├── repository/               # Data access layer
+│   │   │   │   ├── entity/                   # JPA entities
+│   │   │   │   └── dto/                      # Data transfer objects
+│   │   │   │
+│   │   │   ├── registration/                 # Registration Module
+│   │   │   │   ├── package-info.java
+│   │   │   │   ├── controller/
+│   │   │   │   ├── service/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── entity/
+│   │   │   │   └── dto/
+│   │   │   │
+│   │   │   ├── clinical/                     # Clinical Module
+│   │   │   │   ├── package-info.java
+│   │   │   │   ├── controller/
+│   │   │   │   ├── service/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── entity/
+│   │   │   │   └── dto/
+│   │   │   │
+│   │   │   ├── billing/                      # Billing Module
+│   │   │   │   ├── package-info.java
+│   │   │   │   ├── controller/
+│   │   │   │   ├── service/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── entity/
+│   │   │   │   └── dto/
+│   │   │   │
+│   │   │   ├── pharmacy/                     # Pharmacy Module
+│   │   │   │   ├── package-info.java
+│   │   │   │   ├── controller/
+│   │   │   │   ├── service/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── entity/
+│   │   │   │   └── dto/
+│   │   │   │
+│   │   │   ├── laboratory/                   # Laboratory Module
+│   │   │   │   ├── package-info.java
+│   │   │   │   ├── controller/
+│   │   │   │   ├── service/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── entity/
+│   │   │   │   └── dto/
+│   │   │   │
+│   │   │   ├── radiology/                    # Radiology Module
+│   │   │   │   ├── package-info.java
+│   │   │   │   ├── controller/
+│   │   │   │   ├── service/
+│   │   │   │   ├── repository/
+│   │   │   │   ├── entity/
+│   │   │   │   └── dto/
+│   │   │   │
+│   │   │   ├── integration/                  # Integration Modules
+│   │   │   │   ├── bpjs/                     # BPJS Integration
+│   │   │   │   │   ├── package-info.java
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   ├── service/
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   ├── entity/
+│   │   │   │   │   └── dto/
+│   │   │   │   │
+│   │   │   │   └── satusehat/                # SATUSEHAT Integration
+│   │   │   │       ├── package-info.java
+│   │   │   │       ├── controller/
+│   │   │   │       ├── service/
+│   │   │   │       ├── repository/
+│   │   │   │       ├── entity/
+│   │   │   │       └── dto/
+│   │   │   │
+│   │   │   └── shared/                       # Shared Module (Common)
+│   │   │       ├── package-info.java
+│   │   │       ├── config/                   # Spring configurations
+│   │   │       ├── constant/                 # Application constants
+│   │   │       ├── dto/                      # Common DTOs
+│   │   │       ├── exception/                # Exception handling
+│   │   │       └── util/                     # Utility classes
+│   │   │
+│   │   └── resources/
+│   │       ├── application.yml               # Main configuration
+│   │       ├── application-dev.yml           # Development config
+│   │       ├── application-staging.yml       # Staging config
+│   │       └── application-production.yml    # Production config
+│   │
+│   └── test/
+│       ├── java/com/yudha/hms/              # Test classes
+│       └── resources/                        # Test resources
+│
+└── target/                                   # Maven build output (gitignored)

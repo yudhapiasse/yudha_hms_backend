@@ -1,0 +1,74 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 20
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      leak-detection-threshold: 60000
+
+  jpa:
+    show-sql: false
+    hibernate:
+      ddl-auto: validate # NEVER use 'update' or 'create-drop' in production
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 30
+          fetch_size: 100
+
+  devtools:
+    restart:
+      enabled: false
+
+logging:
+  level:
+    root: WARN
+    com.yudha.hms: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  file:
+    name: /var/log/hms/hms-production.log
+    max-size: 200MB
+    max-history: 60
+  pattern:
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+server:
+  port: 8080
+  compression:
+    enabled: true
+  error:
+    include-stacktrace: never
+    include-message: always
+    include-binding-errors: never
+    include-exception: false
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 20
+    connection-timeout: 20000
+    accept-count: 100
+
+# Production-specific settings
+hms:
+  security:
+    jwt:
+      secret: ${JWT_SECRET}
+      expiration: 28800000 # 8 hours for production (more secure)
+      refresh-expiration: 604800000 # 7 days
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: never # Hide details in production
