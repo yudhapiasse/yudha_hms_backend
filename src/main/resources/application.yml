@@ -71,6 +71,16 @@ hms:
     number-format: "YYYYMM-XXXXX"
     number-prefix: "HMS"
 
+  file-storage:
+    upload-dir: ${HMS_UPLOAD_DIR:./uploads}
+    patient-photos-dir: ${HMS_UPLOAD_DIR:./uploads}/patient-photos
+    thumbnails-dir: ${HMS_UPLOAD_DIR:./uploads}/patient-photos/thumbnails
+    max-file-size: 5242880 # 5MB in bytes
+    allowed-extensions: jpg,jpeg,png,gif,webp
+    thumbnail-width: 150
+    thumbnail-height: 150
+    default-avatar-url: /api/files/default-avatar.png
+
   security:
     jwt:
       secret: ${JWT_SECRET:changeme-in-production-use-strong-secret-key}

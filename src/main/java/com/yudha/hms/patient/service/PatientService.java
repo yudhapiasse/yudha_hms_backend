@@ -44,6 +44,9 @@ import java.util.stream.Collectors;
 public class PatientService {
 
     private final PatientRepository patientRepository;
+    private final com.yudha.hms.shared.service.FileStorageService fileStorageService;
+    private final com.yudha.hms.shared.service.ImageService imageService;
+    private final com.yudha.hms.shared.config.FileStorageProperties fileStorageProperties;
 
     /**
      * Register a new patient.
@@ -898,5 +901,99 @@ public class PatientService {
         }
 
         return dto;
+    }
+
+    // ============================================================================
+    // PHOTO MANAGEMENT
+    // ============================================================================
+
+    /**
+     * Upload patient photo
+     *
+     * @param patientId patient UUID
+     * @param file photo file
+     * @return photo upload response
+     */
+    @Transactional
+    public PhotoUploadResponse uploadPatientPhoto(UUID patientId, org.springframework.web.multipart.MultipartFile file) {
+        log.info("Uploading photo for patient: {}", patientId);
+
+        // Get patient
+        Patient patient = patientRepository.findById(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient", "ID", patientId));
+
+        // Delete old photo if exists
+        if (patient.getPhotoUrl() != null && !patient.getPhotoUrl().isEmpty()) {
+            fileStorageService.deletePatientPhoto(patient.getPhotoUrl());
+        }
+
+        // Store original photo
+        String storedFilename = fileStorageService.storePatientPhoto(file, patientId);
+
+        // Generate and store thumbnail
+        byte[] thumbnailBytes = imageService.generateThumbnail(file);
+        String extension = org.apache.commons.io.FilenameUtils.getExtension(file.getOriginalFilename());
+        String thumbnailFilename = fileStorageService.storeThumbnail(thumbnailBytes, patientId, extension);
+
+        // Update patient photo URL
+        String photoUrl = "/api/patients/photos/" + storedFilename;
+        String thumbnailUrl = "/api/patients/photos/thumbnails/" + thumbnailFilename;
+        patient.setPhotoUrl(photoUrl);
+        patientRepository.save(patient);
+
+        log.info("Photo uploaded successfully for patient: {}", patientId);
+
+        return PhotoUploadResponse.builder()
+            .photoUrl(photoUrl)
+            .thumbnailUrl(thumbnailUrl)
+            .originalFilename(file.getOriginalFilename())
+            .storedFilename(storedFilename)
+            .fileSizeBytes(file.getSize())
+            .fileSize(PhotoUploadResponse.formatFileSize(file.getSize()))
+            .contentType(file.getContentType())
+            .uploadedAt(LocalDateTime.now())
+            .build();
+    }
+
+    /**
+     * Delete patient photo (GDPR-compliant)
+     *
+     * @param patientId patient UUID
+     */
+    @Transactional
+    public void deletePatientPhoto(UUID patientId) {
+        log.info("Deleting photo for patient: {}", patientId);
+
+        Patient patient = patientRepository.findById(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient", "ID", patientId));
+
+        if (patient.getPhotoUrl() != null && !patient.getPhotoUrl().isEmpty()) {
+            // Delete from filesystem
+            boolean deleted = fileStorageService.deletePatientPhoto(patient.getPhotoUrl());
+
+            if (deleted) {
+                // Update patient record
+                patient.setPhotoUrl(null);
+                patientRepository.save(patient);
+                log.info("Photo deleted successfully for patient: {}", patientId);
+            }
+        }
+    }
+
+    /**
+     * Get patient photo URL or default avatar
+     *
+     * @param patientId patient UUID
+     * @return photo URL
+     */
+    public String getPatientPhotoUrl(UUID patientId) {
+        Patient patient = patientRepository.findById(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient", "ID", patientId));
+
+        if (patient.getPhotoUrl() != null && !patient.getPhotoUrl().isEmpty()) {
+            return patient.getPhotoUrl();
+        }
+
+        return fileStorageProperties.getDefaultAvatarUrl();
     }
 }
