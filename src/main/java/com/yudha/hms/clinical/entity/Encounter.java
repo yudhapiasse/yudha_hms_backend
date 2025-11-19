@@ -94,9 +94,15 @@ public class Encounter extends AuditableEntity {
     @Column(name = "status", nullable = false, length = 30)
     @NotNull(message = "Status is required")
     @Builder.Default
-    private EncounterStatus status = EncounterStatus.REGISTERED;
+    private EncounterStatus status = EncounterStatus.PLANNED;
 
     // ========== Department/Location ==========
+    @Column(name = "department_id")
+    private UUID departmentId;
+
+    @Column(name = "location_id")
+    private UUID locationId;
+
     @Column(name = "current_department", length = 100)
     private String currentDepartment;
 
@@ -107,6 +113,12 @@ public class Encounter extends AuditableEntity {
     private String admittingDepartment;
 
     // ========== Care Team ==========
+    @Column(name = "practitioner_id")
+    private UUID practitionerId; // Attending/primary doctor
+
+    @Column(name = "referring_practitioner_id")
+    private UUID referringPractitionerId;
+
     @Column(name = "attending_doctor_id")
     private UUID attendingDoctorId;
 
@@ -120,8 +132,9 @@ public class Encounter extends AuditableEntity {
     private String primaryNurseName;
 
     // ========== Priority ==========
+    @Enumerated(EnumType.STRING)
     @Column(name = "priority", length = 20)
-    private String priority; // ROUTINE, URGENT, EMERGENCY, STAT
+    private Priority priority; // ROUTINE, URGENT, EMERGENCY, STAT
 
     // ========== Service Type ==========
     @Column(name = "service_type", length = 50)
@@ -162,12 +175,19 @@ public class Encounter extends AuditableEntity {
     private Integer lengthOfStayDays;
 
     // ========== BPJS/Insurance ==========
+    @Enumerated(EnumType.STRING)
+    @Column(name = "insurance_type", length = 30)
+    private InsuranceType insuranceType; // BPJS, PRIVATE_INSURANCE, SELF_PAY
+
+    @Column(name = "insurance_number", length = 100)
+    private String insuranceNumber;
+
     @Column(name = "is_bpjs")
     @Builder.Default
     private Boolean isBpjs = false;
 
     @Column(name = "sep_number", length = 50)
-    private String sepNumber;
+    private String sepNumber; // BPJS Surat Eligibilitas Peserta
 
     @Column(name = "sep_date")
     private java.time.LocalDate sepDate;
@@ -175,12 +195,16 @@ public class Encounter extends AuditableEntity {
     @Column(name = "insurance_provider", length = 200)
     private String insuranceProvider;
 
-    @Column(name = "insurance_number", length = 100)
-    private String insuranceNumber;
-
     // ========== SATUSEHAT Integration ==========
     @Column(name = "satusehat_encounter_id", length = 100)
     private String satusehatEncounterId;
+
+    @Column(name = "satusehat_synced")
+    @Builder.Default
+    private Boolean satusehatSynced = false;
+
+    @Column(name = "satusehat_synced_at")
+    private LocalDateTime satusehatSyncedAt;
 
     @Column(name = "satusehat_submitted")
     @Builder.Default
@@ -216,6 +240,18 @@ public class Encounter extends AuditableEntity {
     @Builder.Default
     private List<DepartmentTransfer> transfers = new ArrayList<>();
 
+    @OneToMany(mappedBy = "encounter", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<EncounterParticipant> participants = new ArrayList<>();
+
+    @OneToMany(mappedBy = "encounter", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<EncounterDiagnosis> diagnoses = new ArrayList<>();
+
+    @OneToMany(mappedBy = "encounter", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<EncounterStatusHistory> statusHistory = new ArrayList<>();
+
     // ========== Business Methods ==========
 
     /**
@@ -226,6 +262,44 @@ public class Encounter extends AuditableEntity {
         if (this.encounterStart == null) {
             this.encounterStart = LocalDateTime.now();
         }
+    }
+
+    /**
+     * Mark patient as arrived.
+     */
+    public void markAsArrived() {
+        this.status = EncounterStatus.ARRIVED;
+    }
+
+    /**
+     * Mark patient as triaged.
+     */
+    public void markAsTriaged() {
+        this.status = EncounterStatus.TRIAGED;
+    }
+
+    /**
+     * Add a participant to the encounter.
+     */
+    public void addParticipant(EncounterParticipant participant) {
+        participants.add(participant);
+        participant.setEncounter(this);
+    }
+
+    /**
+     * Add a diagnosis to the encounter.
+     */
+    public void addDiagnosis(EncounterDiagnosis diagnosis) {
+        diagnoses.add(diagnosis);
+        diagnosis.setEncounter(this);
+    }
+
+    /**
+     * Add status history entry.
+     */
+    public void addStatusHistory(EncounterStatusHistory history) {
+        statusHistory.add(history);
+        history.setEncounter(this);
     }
 
     /**
@@ -287,6 +361,7 @@ public class Encounter extends AuditableEntity {
      * Check if encounter can be cancelled.
      */
     public boolean canBeCancelled() {
-        return status == EncounterStatus.REGISTERED || status == EncounterStatus.IN_PROGRESS;
+        return status == EncounterStatus.PLANNED || status == EncounterStatus.ARRIVED ||
+               status == EncounterStatus.TRIAGED || status == EncounterStatus.IN_PROGRESS;
     }
 }

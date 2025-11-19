@@ -11,10 +11,12 @@ import lombok.Getter;
  */
 @Getter
 public enum EncounterStatus {
-    REGISTERED("Registered", "Terdaftar", 1),
-    IN_PROGRESS("In Progress", "Sedang Berlangsung", 2),
-    FINISHED("Finished", "Selesai", 3),
-    CANCELLED("Cancelled", "Dibatalkan", 4);
+    PLANNED("Planned", "Direncanakan", 1),
+    ARRIVED("Arrived", "Tiba", 2),
+    TRIAGED("Triaged", "Sudah Triase", 3),
+    IN_PROGRESS("In Progress", "Sedang Berlangsung", 4),
+    FINISHED("Finished", "Selesai", 5),
+    CANCELLED("Cancelled", "Dibatalkan", 6);
 
     private final String displayName;
     private final String indonesianName;
@@ -27,7 +29,7 @@ public enum EncounterStatus {
     }
 
     public boolean isActive() {
-        return this == REGISTERED || this == IN_PROGRESS;
+        return this == PLANNED || this == ARRIVED || this == TRIAGED || this == IN_PROGRESS;
     }
 
     public boolean isCompleted() {
