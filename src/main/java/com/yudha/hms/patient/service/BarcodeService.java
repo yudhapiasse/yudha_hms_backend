@@ -1,6 +1,7 @@
 package com.yudha.hms.patient.service;
 
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.MultiFormatWriter;
 import com.google.zxing.WriterException;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
@@ -106,7 +107,7 @@ public class BarcodeService {
             log.debug("Generating barcode for MRN: {}", mrn);
 
             // Generate CODE_128 barcode
-            QRCodeWriter barcodeWriter = new QRCodeWriter();
+            MultiFormatWriter barcodeWriter = new MultiFormatWriter();
             BitMatrix bitMatrix = barcodeWriter.encode(mrn, BarcodeFormat.CODE_128, width, height);
 
             // Convert to image bytes
