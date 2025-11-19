@@ -215,14 +215,14 @@ CREATE TABLE IF NOT EXISTS registration_schema.outpatient_registration (
     version BIGINT DEFAULT 0
 );
 
-CREATE INDEX idx_registration_number ON registration_schema.outpatient_registration(registration_number);
-CREATE INDEX idx_registration_patient ON registration_schema.outpatient_registration(patient_id);
-CREATE INDEX idx_registration_date ON registration_schema.outpatient_registration(registration_date);
-CREATE INDEX idx_registration_polyclinic ON registration_schema.outpatient_registration(polyclinic_id);
-CREATE INDEX idx_registration_doctor ON registration_schema.outpatient_registration(doctor_id);
-CREATE INDEX idx_registration_status ON registration_schema.outpatient_registration(status);
-CREATE INDEX idx_registration_type ON registration_schema.outpatient_registration(registration_type);
-CREATE INDEX idx_registration_queue ON registration_schema.outpatient_registration(queue_number);
+CREATE INDEX idx_outpatient_registration_number ON registration_schema.outpatient_registration(registration_number);
+CREATE INDEX idx_outpatient_registration_patient ON registration_schema.outpatient_registration(patient_id);
+CREATE INDEX idx_outpatient_registration_date ON registration_schema.outpatient_registration(registration_date);
+CREATE INDEX idx_outpatient_registration_polyclinic ON registration_schema.outpatient_registration(polyclinic_id);
+CREATE INDEX idx_outpatient_registration_doctor ON registration_schema.outpatient_registration(doctor_id);
+CREATE INDEX idx_outpatient_registration_status ON registration_schema.outpatient_registration(status);
+CREATE INDEX idx_outpatient_registration_type ON registration_schema.outpatient_registration(registration_type);
+CREATE INDEX idx_outpatient_registration_queue ON registration_schema.outpatient_registration(queue_number);
 
 COMMENT ON TABLE registration_schema.outpatient_registration IS 'Outpatient registration records';
 COMMENT ON COLUMN registration_schema.outpatient_registration.registration_type IS 'WALK_IN or APPOINTMENT';
