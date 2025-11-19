@@ -113,7 +113,7 @@ public class EmergencyRegistrationRequest {
     // ========== Medical History (Brief) ==========
     private String medicalHistorySummary;
     private String currentMedications;
-    private String allergies;
+private String allergies;
     private String specialNeeds;
 
     // ========== Notes ==========
