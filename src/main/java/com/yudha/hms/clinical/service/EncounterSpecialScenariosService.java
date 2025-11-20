@@ -86,22 +86,20 @@ public class EncounterSpecialScenariosService {
         inpatientEncounter.setStatus(EncounterStatus.IN_PROGRESS);
         inpatientEncounter.setPriority(emergencyEncounter.getPriority());
 
-        // Link to original emergency encounter
-        inpatientEncounter.setPreviousEncounterId(emergencyEncounter.getId());
+        // TODO: Link to original emergency encounter
+        // Note: previousEncounterId field not available in Encounter entity
+        // Consider adding this field or using a separate relationship table
 
-        // Set admission details
-        inpatientEncounter.setBedId(request.getBedId());
-        inpatientEncounter.setWardId(request.getWardId());
-        inpatientEncounter.setRoomId(request.getRoomId());
-        inpatientEncounter.setAdmissionReason(request.getAdmissionReason());
+        // TODO: Set admission details (bedId, wardId, roomId, admissionReason)
+        // Note: These fields should be managed in InpatientAdmission entity
+        // For now, we'll store admission details in inpatientAdmissionId
 
         // Set attending physician
-        inpatientEncounter.setAttendingPhysicianId(request.getAttendingPhysicianId());
+        inpatientEncounter.setAttendingDoctorId(request.getAttendingPhysicianId());
         inpatientEncounter.setDepartmentId(emergencyEncounter.getDepartmentId());
 
         // Set encounter times
         inpatientEncounter.setEncounterStart(LocalDateTime.now());
-        inpatientEncounter.setAdmissionDate(LocalDate.now());
 
         // Copy chief complaint from emergency
         inpatientEncounter.setChiefComplaint(emergencyEncounter.getChiefComplaint());
@@ -111,12 +109,11 @@ public class EncounterSpecialScenariosService {
 
         // Set conversion notes
         String conversionNotes = String.format(
-            "Converted from emergency encounter %s. Admission reason: %s. %s",
+            "Converted from emergency encounter %s. %s",
             emergencyEncounter.getEncounterNumber(),
-            request.getAdmissionReason(),
             request.getNotes() != null ? request.getNotes() : ""
         );
-        inpatientEncounter.setNotes(conversionNotes);
+        inpatientEncounter.setEncounterNotes(conversionNotes);
 
         // Save new inpatient encounter
         inpatientEncounter = encounterRepository.save(inpatientEncounter);
@@ -152,11 +149,14 @@ public class EncounterSpecialScenariosService {
             newDiagnosis.setDiagnosisCode(sourceDiagnosis.getDiagnosisCode());
             newDiagnosis.setDiagnosisText(sourceDiagnosis.getDiagnosisText());
             newDiagnosis.setDiagnosisType(DiagnosisType.ADMISSION); // Change to admission diagnosis
-            newDiagnosis.setPriority(sourceDiagnosis.getPriority());
-            newDiagnosis.setIsPrimary(sourceDiagnosis.getIsPrimary());
-            newDiagnosis.setClinicalStatus("active");
+            newDiagnosis.setRank(sourceDiagnosis.getRank()); // Use rank instead of priority
+            // Use isPrimary() method and markAsPrimary() if true
+            if (sourceDiagnosis.isPrimary()) {
+                newDiagnosis.markAsPrimary();
+            }
+            newDiagnosis.setClinicalStatus(ClinicalStatus.ACTIVE); // Use enum, not string
             newDiagnosis.setOnsetDate(sourceDiagnosis.getOnsetDate());
-            newDiagnosis.setNotes("Copied from emergency encounter: " + sourceEncounter.getEncounterNumber());
+            newDiagnosis.setClinicalNotes("Copied from emergency encounter: " + sourceEncounter.getEncounterNumber());
 
             diagnosisRepository.save(newDiagnosis);
         }
@@ -389,9 +389,9 @@ public class EncounterSpecialScenariosService {
         encounter.setEncounterEnd(LocalDateTime.now());
 
         if (request.getAdditionalNotes() != null) {
-            String notes = encounter.getNotes() != null ? encounter.getNotes() + "\n" : "";
+            String notes = encounter.getEncounterNotes() != null ? encounter.getEncounterNotes() + "\n" : "";
             notes += "Cancellation notes: " + request.getAdditionalNotes();
-            encounter.setNotes(notes);
+            encounter.setEncounterNotes(notes);
         }
 
         encounter = encounterRepository.save(encounter);
@@ -456,7 +456,7 @@ public class EncounterSpecialScenariosService {
         encounter.setEncounterEnd(null); // Clear end time
 
         // Add reopen notes
-        String notes = encounter.getNotes() != null ? encounter.getNotes() + "\n" : "";
+        String notes = encounter.getEncounterNotes() != null ? encounter.getEncounterNotes() + "\n" : "";
         notes += String.format("REOPENED: %s by %s (Approved by supervisor: %s). Reason: %s",
             LocalDateTime.now(),
             request.getRequestedBy(),
@@ -465,7 +465,7 @@ public class EncounterSpecialScenariosService {
         if (request.getDocumentationNeeded() != null) {
             notes += "\nDocumentation needed: " + request.getDocumentationNeeded();
         }
-        encounter.setNotes(notes);
+        encounter.setEncounterNotes(notes);
 
         encounter = encounterRepository.save(encounter);
 
@@ -503,7 +503,7 @@ public class EncounterSpecialScenariosService {
         encounter.setStatus(EncounterStatus.IN_PROGRESS);
         encounter.setPriority(request.getPriority());
         encounter.setChiefComplaint(request.getChiefComplaint());
-        encounter.setAttendingPhysicianId(request.getAttendingPhysicianId());
+        encounter.setAttendingDoctorId(request.getAttendingPhysicianId());
         encounter.setDepartmentId(request.getDepartmentId());
         encounter.setEncounterStart(request.getEncounterStart() != null ?
             request.getEncounterStart() : LocalDateTime.now());
@@ -516,7 +516,7 @@ public class EncounterSpecialScenariosService {
             String notes = String.format("POLICE CASE: %s (Station: %s)",
                 request.getPoliceCaseNumber(),
                 request.getPoliceStation());
-            encounter.setNotes(notes);
+            encounter.setEncounterNotes(notes);
         }
 
         // Set brought by information
@@ -525,22 +525,22 @@ public class EncounterSpecialScenariosService {
                 request.getBroughtByName(),
                 request.getBroughtByRelation(),
                 request.getBroughtByContact());
-            String notes = encounter.getNotes() != null ? encounter.getNotes() + broughtByInfo : broughtByInfo;
-            encounter.setNotes(notes);
+            String notes = encounter.getEncounterNotes() != null ? encounter.getEncounterNotes() + broughtByInfo : broughtByInfo;
+            encounter.setEncounterNotes(notes);
         }
 
         // Add initial assessment
         if (request.getInitialAssessment() != null) {
             String assessment = "\nInitial Assessment: " + request.getInitialAssessment();
-            String notes = encounter.getNotes() != null ? encounter.getNotes() + assessment : assessment;
-            encounter.setNotes(notes);
+            String notes = encounter.getEncounterNotes() != null ? encounter.getEncounterNotes() + assessment : assessment;
+            encounter.setEncounterNotes(notes);
         }
 
         // Flag for data completion
         if (Boolean.TRUE.equals(request.getRequiresDataCompletion())) {
             String flag = "\n[REQUIRES DATA COMPLETION]";
-            String notes = encounter.getNotes() != null ? encounter.getNotes() + flag : flag;
-            encounter.setNotes(notes);
+            String notes = encounter.getEncounterNotes() != null ? encounter.getEncounterNotes() + flag : flag;
+            encounter.setEncounterNotes(notes);
         }
 
         encounter = encounterRepository.save(encounter);

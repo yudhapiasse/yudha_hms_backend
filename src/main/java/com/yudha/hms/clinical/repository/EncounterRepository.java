@@ -118,4 +118,14 @@ public interface EncounterRepository extends JpaRepository<Encounter, UUID>, Jpa
         @Param("startDate") LocalDateTime startDate,
         @Param("endDate") LocalDateTime endDate
     );
+
+    /**
+     * Find encounters by patient ID and encounter start date range.
+     */
+    @Query("SELECT e FROM Encounter e WHERE e.patientId = :patientId AND e.encounterStart BETWEEN :startDate AND :endDate ORDER BY e.encounterStart DESC")
+    List<Encounter> findByPatientIdAndEncounterStartBetween(
+        @Param("patientId") UUID patientId,
+        @Param("startDate") LocalDateTime startDate,
+        @Param("endDate") LocalDateTime endDate
+    );
 }
