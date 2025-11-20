@@ -72,4 +72,115 @@ public interface EncounterDiagnosisRepository extends JpaRepository<EncounterDia
      * Count diagnoses for an encounter.
      */
     long countByEncounterId(UUID encounterId);
+
+    // ========== Diagnosis History Queries ==========
+
+    /**
+     * Get diagnosis history for a patient across all encounters.
+     */
+    @Query("""
+        SELECT ed FROM EncounterDiagnosis ed
+        JOIN ed.encounter e
+        WHERE e.patientId = :patientId
+        ORDER BY ed.recordedDate DESC, ed.rank ASC
+        """)
+    List<EncounterDiagnosis> findDiagnosisHistoryByPatient(@Param("patientId") UUID patientId);
+
+    /**
+     * Get diagnosis history for a patient with specific diagnosis code.
+     */
+    @Query("""
+        SELECT ed FROM EncounterDiagnosis ed
+        JOIN ed.encounter e
+        WHERE e.patientId = :patientId
+        AND ed.diagnosisCode = :diagnosisCode
+        ORDER BY ed.recordedDate DESC
+        """)
+    List<EncounterDiagnosis> findPatientDiagnosisHistory(
+        @Param("patientId") UUID patientId,
+        @Param("diagnosisCode") String diagnosisCode
+    );
+
+    /**
+     * Get all unique diagnosis codes for a patient.
+     */
+    @Query("""
+        SELECT DISTINCT ed.diagnosisCode, ed.diagnosisText
+        FROM EncounterDiagnosis ed
+        JOIN ed.encounter e
+        WHERE e.patientId = :patientId
+        ORDER BY ed.diagnosisCode ASC
+        """)
+    List<Object[]> findUniquePatientDiagnoses(@Param("patientId") UUID patientId);
+
+    /**
+     * Get chronic/recurring diagnoses for a patient (appears 3+ times).
+     */
+    @Query("""
+        SELECT ed.diagnosisCode, ed.diagnosisText, COUNT(ed)
+        FROM EncounterDiagnosis ed
+        JOIN ed.encounter e
+        WHERE e.patientId = :patientId
+        GROUP BY ed.diagnosisCode, ed.diagnosisText
+        HAVING COUNT(ed) >= :minOccurrences
+        ORDER BY COUNT(ed) DESC
+        """)
+    List<Object[]> findRecurringDiagnoses(
+        @Param("patientId") UUID patientId,
+        @Param("minOccurrences") long minOccurrences
+    );
+
+    /**
+     * Get active diagnoses for a patient across all active encounters.
+     */
+    @Query("""
+        SELECT ed FROM EncounterDiagnosis ed
+        JOIN ed.encounter e
+        WHERE e.patientId = :patientId
+        AND ed.clinicalStatus = 'ACTIVE'
+        AND e.status IN ('IN_PROGRESS', 'ARRIVED', 'TRIAGED')
+        ORDER BY ed.recordedDate DESC
+        """)
+    List<EncounterDiagnosis> findActivePatientDiagnoses(@Param("patientId") UUID patientId);
+
+    /**
+     * Get diagnosis count by code for analytics.
+     */
+    @Query("""
+        SELECT ed.diagnosisCode, ed.diagnosisText, COUNT(ed)
+        FROM EncounterDiagnosis ed
+        WHERE ed.recordedDate >= :startDate
+        GROUP BY ed.diagnosisCode, ed.diagnosisText
+        ORDER BY COUNT(ed) DESC
+        """)
+    List<Object[]> countDiagnosisUsageSince(@Param("startDate") java.time.LocalDateTime startDate);
+
+    /**
+     * Get diagnosis statistics by department.
+     */
+    @Query("""
+        SELECT e.departmentId, ed.diagnosisCode, ed.diagnosisText, COUNT(ed)
+        FROM EncounterDiagnosis ed
+        JOIN ed.encounter e
+        WHERE e.departmentId IS NOT NULL
+        AND ed.recordedDate >= :startDate
+        GROUP BY e.departmentId, ed.diagnosisCode, ed.diagnosisText
+        ORDER BY e.departmentId, COUNT(ed) DESC
+        """)
+    List<Object[]> getDiagnosisStatsByDepartment(@Param("startDate") java.time.LocalDateTime startDate);
+
+    /**
+     * Check if patient has specific diagnosis in history.
+     */
+    @Query("""
+        SELECT CASE WHEN COUNT(ed) > 0 THEN true ELSE false END
+        FROM EncounterDiagnosis ed
+        JOIN ed.encounter e
+        WHERE e.patientId = :patientId
+        AND ed.diagnosisCode = :diagnosisCode
+        """)
+    boolean hasPatientBeenDiagnosedWith(
+        @Param("patientId") UUID patientId,
+        @Param("diagnosisCode") String diagnosisCode
+    );
 }
