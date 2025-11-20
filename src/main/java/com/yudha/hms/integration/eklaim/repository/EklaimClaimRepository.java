@@ -50,14 +50,12 @@ public interface EklaimClaimRepository extends JpaRepository<EklaimClaim, UUID> 
     /**
      * Find claims by patient ID
      */
-    @Query("SELECT c FROM EklaimClaim c WHERE c.patientId = :patientId")
-    List<EklaimClaim> findByPatientId(@Param("patientId") UUID patientId);
+    List<EklaimClaim> findByPatientId(UUID patientId);
 
     /**
      * Find claims by encounter ID
      */
-    @Query("SELECT c FROM EklaimClaim c WHERE c.encounterId = :encounterId")
-    Optional<EklaimClaim> findByEncounterId(@Param("encounterId") UUID encounterId);
+    Optional<EklaimClaim> findByEncounterId(UUID encounterId);
 
     /**
      * Find draft claims (status = 1) older than specified date

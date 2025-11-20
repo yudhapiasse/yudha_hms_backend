@@ -2,6 +2,7 @@ package com.yudha.hms.integration.satusehat.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
@@ -41,6 +42,7 @@ import java.util.UUID;
         @Index(name = "idx_satusehat_mapping_identifier", columnList = "satusehat_identifier")
     })
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class SatusehatResourceMapping {
@@ -48,6 +50,9 @@ public class SatusehatResourceMapping {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+
+    @Column(name = "organization_id", nullable = false, length = 100)
+    private String organizationId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "config_id")
@@ -59,6 +64,10 @@ public class SatusehatResourceMapping {
 
     @Column(name = "local_resource_id", nullable = false)
     private UUID localResourceId;
+
+    // Resource type (Patient, Encounter, etc.)
+    @Column(name = "resource_type", nullable = false, length = 100)
+    private String resourceType;
 
     // SATUSEHAT resource reference
     @Column(name = "satusehat_resource_type", nullable = false, length = 100)
@@ -91,6 +100,13 @@ public class SatusehatResourceMapping {
      */
     @Column(name = "last_error", columnDefinition = "text")
     private String lastError;
+
+    /**
+     * Retry count for failed submissions
+     */
+    @Column(name = "retry_count")
+    @Builder.Default
+    private Integer retryCount = 0;
 
     /**
      * FHIR resource version ID
@@ -164,6 +180,14 @@ public class SatusehatResourceMapping {
      */
     public void markAsFailed(String errorMessage) {
         this.submissionStatus = SubmissionStatus.FAILED;
+        this.lastError = errorMessage;
+    }
+
+    /**
+     * Increment retry count for failed submission
+     */
+    public void incrementRetryCount(String errorMessage) {
+        this.retryCount = (this.retryCount == null ? 0 : this.retryCount) + 1;
         this.lastError = errorMessage;
     }
 }

@@ -88,4 +88,29 @@ public interface SatusehatResourceMappingRepository extends JpaRepository<Satuse
      */
     @Query("SELECT m FROM SatusehatResourceMapping m WHERE m.config.id = :configId")
     List<SatusehatResourceMapping> findByConfigId(@Param("configId") UUID configId);
+
+    /**
+     * Find mapping by resource type and local resource ID
+     */
+    Optional<SatusehatResourceMapping> findByResourceTypeAndLocalResourceId(
+        String resourceType,
+        UUID localResourceId
+    );
+
+    /**
+     * Find mappings by resource type and submission status
+     */
+    List<SatusehatResourceMapping> findByResourceTypeAndSubmissionStatus(
+        String resourceType,
+        SatusehatResourceMapping.SubmissionStatus status
+    );
+
+    /**
+     * Find mappings by organization, resource type, and submission status
+     */
+    List<SatusehatResourceMapping> findByOrganizationIdAndResourceTypeAndSubmissionStatus(
+        String organizationId,
+        String resourceType,
+        SatusehatResourceMapping.SubmissionStatus status
+    );
 }

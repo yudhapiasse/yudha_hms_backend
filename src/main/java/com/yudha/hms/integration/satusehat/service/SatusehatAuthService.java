@@ -188,7 +188,7 @@ public class SatusehatAuthService {
     /**
      * Get active configuration by organization ID.
      */
-    private SatusehatConfig getActiveConfig(String organizationId) {
+    public SatusehatConfig getActiveConfig(String organizationId) {
         return configRepository.findByOrganizationIdAndIsActiveTrue(organizationId)
             .orElseThrow(() -> new SatusehatIntegrationException(
                 "SATUSEHAT configuration not found for organization: " + organizationId,
