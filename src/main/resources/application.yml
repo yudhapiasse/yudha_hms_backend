@@ -87,6 +87,68 @@ hms:
       expiration: 86400000 # 24 hours in milliseconds
       refresh-expiration: 604800000 # 7 days in milliseconds
 
+# BPJS Kesehatan Integration Configuration
+bpjs:
+  # Environment: development or production
+  environment: ${BPJS_ENVIRONMENT:development}
+
+  # Enable/disable BPJS integration
+  enabled: ${BPJS_ENABLED:false}
+
+  # BPJS API Credentials (from BPJS Trust Mark registration)
+  cons-id: ${BPJS_CONS_ID:}
+  cons-secret: ${BPJS_CONS_SECRET:}
+  user-key: ${BPJS_USER_KEY:}
+
+  # Healthcare facility information
+  facility-code: ${BPJS_FACILITY_CODE:}
+  facility-name: ${BPJS_FACILITY_NAME:}
+
+  # Connection settings (milliseconds)
+  connection-timeout: 30000  # 30 seconds
+  read-timeout: 60000        # 60 seconds
+
+  # Enable request/response logging
+  logging-enabled: ${BPJS_LOGGING_ENABLED:true}
+
+  # Timezone for Indonesia
+  timezone: Asia/Jakarta
+
+  # VClaim Service Endpoints (Claims and Eligibility)
+  vclaim:
+    dev-base-url: https://apijkn-dev.bpjs-kesehatan.go.id/vclaim-rest-dev
+    prod-base-url: https://apijkn.bpjs-kesehatan.go.id/vclaim-rest
+
+  # Antrean RS Endpoints (Hospital Queue Management)
+  antrean-rs:
+    dev-base-url: https://apijkn-dev.bpjs-kesehatan.go.id/antreanrs-dev
+    prod-base-url: https://apijkn.bpjs-kesehatan.go.id/antreanrs
+
+  # Apotek Endpoints (Pharmacy Services)
+  apotek:
+    dev-base-url: https://apijkn-dev.bpjs-kesehatan.go.id/apotek-rest-dev
+    prod-base-url: https://apijkn.bpjs-kesehatan.go.id/apotek-rest
+
+  # Aplicares Endpoints (Care Application Services)
+  aplicares:
+    dev-base-url: https://apijkn-dev.bpjs-kesehatan.go.id/aplicaresws-rest-dev
+    prod-base-url: https://new-api.bpjs-kesehatan.go.id/aplicaresws
+
+  # iCare JKN Endpoints (Hospital Information System Integration)
+  icare:
+    dev-base-url: https://apijkn-dev.bpjs-kesehatan.go.id/icare-dev
+    prod-base-url: https://apijkn.bpjs-kesehatan.go.id/wsihs/api/rs
+
+  # eRekamMedis Endpoints (Electronic Medical Records)
+  erekammedis:
+    dev-base-url: https://apijkn-dev.bpjs-kesehatan.go.id/erekammedis-dev
+    prod-base-url: https://dvlp.bpjs-kesehatan.go.id/eRekamMedis
+
+  # PCare Endpoints (Primary Care Services)
+  pcare:
+    dev-base-url: https://apijkn-dev.bpjs-kesehatan.go.id/pcare-rest-dev
+    prod-base-url: https://apijkn.bpjs-kesehatan.go.id/pcare-rest
+
 # Logging configuration
 logging:
   level:
