@@ -553,9 +553,20 @@ public class EncounterService {
         return null;
     }
 
+    /**
+     * Get encounter entity by ID.
+     *
+     * @param id Encounter ID
+     * @return Encounter entity
+     */
+    public Encounter getEncounterEntity(UUID id) {
+        return encounterRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Encounter not found with id: " + id));
+    }
+
     // ========== Mapping Methods ==========
 
-    private EncounterResponse mapToResponse(Encounter encounter) {
+    public EncounterResponse mapToResponse(Encounter encounter) {
         return EncounterResponse.builder()
             .id(encounter.getId())
             .encounterNumber(encounter.getEncounterNumber())
