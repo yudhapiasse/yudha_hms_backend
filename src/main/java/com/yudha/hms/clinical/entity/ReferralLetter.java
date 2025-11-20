@@ -55,9 +55,10 @@ public class ReferralLetter extends AuditableEntity {
     private UUID patientId;
 
     // ========== Referral Type ==========
-    @Column(name = "referral_type", nullable = false, length = 30)
-    @NotBlank(message = "Referral type is required")
-    private String referralType; // OUTPATIENT, INPATIENT, EMERGENCY, DIAGNOSTIC
+    @Enumerated(EnumType.STRING)
+    @Column(name = "referral_type", nullable = false)
+    @NotNull(message = "Referral type is required")
+    private ReferralType referralType;
 
     @Column(name = "referral_reason", nullable = false, length = 50)
     @NotBlank(message = "Referral reason is required")
@@ -114,6 +115,14 @@ public class ReferralLetter extends AuditableEntity {
     @NotBlank(message = "Chief complaint is required")
     private String chiefComplaint;
 
+    @Column(name = "anamnesis", columnDefinition = "TEXT", nullable = false)
+    @NotBlank(message = "Anamnesis is required")
+    private String anamnesis; // Patient history and complaints
+
+    @Column(name = "physical_examination", columnDefinition = "TEXT", nullable = false)
+    @NotBlank(message = "Physical examination is required")
+    private String physicalExamination;
+
     @Column(name = "clinical_summary", columnDefinition = "TEXT", nullable = false)
     @NotBlank(message = "Clinical summary is required")
     private String clinicalSummary;
@@ -157,8 +166,10 @@ public class ReferralLetter extends AuditableEntity {
     @NotBlank(message = "Reason for referral is required")
     private String reasonForReferral;
 
-    @Column(name = "urgency_level", length = 20)
-    private String urgencyLevel; // ROUTINE, URGENT, EMERGENCY
+    @Enumerated(EnumType.STRING)
+    @Column(name = "urgency", nullable = false)
+    @NotNull(message = "Urgency level is required")
+    private ReferralUrgency urgency;
 
     // ========== Services Requested ==========
     @Column(name = "services_requested", columnDefinition = "TEXT")
@@ -241,7 +252,34 @@ public class ReferralLetter extends AuditableEntity {
     @Column(name = "document_generated_at")
     private LocalDateTime documentGeneratedAt;
 
-    // ========== SATUSEHAT ==========
+    // ========== Integration Tracking ==========
+
+    // BPJS VClaim Integration
+    @Column(name = "bpjs_vclaim_submitted")
+    @Builder.Default
+    private Boolean bpjsVclaimSubmitted = false;
+
+    @Column(name = "bpjs_vclaim_submission_date")
+    private LocalDateTime bpjsVclaimSubmissionDate;
+
+    @Column(name = "bpjs_vclaim_reference_number", length = 100)
+    private String bpjsVclaimReferenceNumber;
+
+    @Column(name = "bpjs_vclaim_response", columnDefinition = "TEXT")
+    private String bpjsVclaimResponse;
+
+    // PCare Integration
+    @Column(name = "pcare_submitted")
+    @Builder.Default
+    private Boolean pcareSubmitted = false;
+
+    @Column(name = "pcare_submission_date")
+    private LocalDateTime pcareSubmissionDate;
+
+    @Column(name = "pcare_reference_number", length = 100)
+    private String pcareReferenceNumber;
+
+    // SATUSEHAT Integration
     @Column(name = "satusehat_submitted")
     @Builder.Default
     private Boolean satusehatSubmitted = false;
@@ -252,11 +290,19 @@ public class ReferralLetter extends AuditableEntity {
     @Column(name = "satusehat_service_request_id", length = 100)
     private String satusehatServiceRequestId;
 
+    // QR Code for Verification
+    @Column(name = "qr_code", length = 1000)
+    private String qrCode;
+
+    @Column(name = "qr_code_url", length = 500)
+    private String qrCodeUrl;
+
     // ========== Status ==========
-    @Column(name = "referral_status", nullable = false, length = 20)
-    @NotBlank(message = "Referral status is required")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "referral_status", nullable = false)
+    @NotNull(message = "Referral status is required")
     @Builder.Default
-    private String referralStatus = "PENDING"; // PENDING, ACCEPTED, COMPLETED, REJECTED, CANCELLED
+    private ReferralStatus referralStatus = ReferralStatus.DRAFT;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
@@ -273,7 +319,7 @@ public class ReferralLetter extends AuditableEntity {
 
     public void accept(String acceptedByName, LocalDateTime appointmentDateTime) {
         this.referralAccepted = true;
-        this.referralStatus = "ACCEPTED";
+        this.referralStatus = ReferralStatus.ACCEPTED;
         this.acceptanceDate = LocalDateTime.now();
         this.acceptedBy = acceptedByName;
         this.appointmentDate = appointmentDateTime;
@@ -281,19 +327,74 @@ public class ReferralLetter extends AuditableEntity {
 
     public void reject(String reason) {
         this.referralAccepted = false;
-        this.referralStatus = "REJECTED";
+        this.referralStatus = ReferralStatus.REJECTED;
         this.rejectionReason = reason;
     }
 
+    public void send() {
+        if (!Boolean.TRUE.equals(signed)) {
+            throw new IllegalStateException("Referral must be signed before sending");
+        }
+        this.referralStatus = ReferralStatus.SENT;
+    }
+
+    public void markPatientTransferred() {
+        this.referralStatus = ReferralStatus.PATIENT_TRANSFERRED;
+    }
+
     public void complete() {
-        this.referralStatus = "COMPLETED";
+        this.referralStatus = ReferralStatus.COMPLETED;
+    }
+
+    public void cancel() {
+        if (!referralStatus.canBeCancelled()) {
+            throw new IllegalStateException(
+                "Cannot cancel referral in status: " + referralStatus.getDisplayName()
+            );
+        }
+        this.referralStatus = ReferralStatus.CANCELLED;
+    }
+
+    public void generateDocument(String documentUrl, String qrCode, String qrCodeUrl) {
+        this.documentGenerated = true;
+        this.documentUrl = documentUrl;
+        this.documentGeneratedAt = LocalDateTime.now();
+        this.qrCode = qrCode;
+        this.qrCodeUrl = qrCodeUrl;
+    }
+
+    public void submitToVClaim(String referenceNumber, String response) {
+        this.bpjsVclaimSubmitted = true;
+        this.bpjsVclaimSubmissionDate = LocalDateTime.now();
+        this.bpjsVclaimReferenceNumber = referenceNumber;
+        this.bpjsVclaimResponse = response;
+    }
+
+    public void submitToPCare(String referenceNumber) {
+        this.pcareSubmitted = true;
+        this.pcareSubmissionDate = LocalDateTime.now();
+        this.pcareReferenceNumber = referenceNumber;
+    }
+
+    public void submitToSatusehat(String referenceId) {
+        this.satusehatSubmitted = true;
+        this.satusehatSubmissionDate = LocalDateTime.now();
+        this.satusehatServiceRequestId = referenceId;
+    }
+
+    public boolean requiresVClaimIntegration() {
+        return referralType.requiresVClaimIntegration();
+    }
+
+    public boolean isExpired() {
+        return validUntil != null && LocalDate.now().isAfter(validUntil);
     }
 
     public boolean isPending() {
-        return "PENDING".equals(referralStatus);
+        return referralStatus.isPending();
     }
 
     public boolean isAccepted() {
-        return "ACCEPTED".equals(referralStatus);
+        return referralStatus == ReferralStatus.ACCEPTED;
     }
 }
