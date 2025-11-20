@@ -23,3 +23,128 @@ they are:
 - Specimen
 - DiagnosticReport
 - EpisodeOfCare
+
+ before continue analyze this /Volumes/Data001/Hospital MS Dev/hms-backend/HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md. from phase 8 ect. is ther eny update?
+
+⏺ I'll analyze the guide from Phase 8 onwards to check for any updates or changes.
+
+⏺ Read(HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md)
+  ⎿  Read 200 lines
+
+⏺ Read(HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md)
+  ⎿  Read 200 lines
+
+⏺ Read(HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md)
+  ⎿  Read 200 lines
+
+⏺ Read(HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md)
+  ⎿  Read 250 lines
+
+⏺ Read(HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md)
+  ⎿  Read 300 lines
+
+⏺ Search(pattern: "^## Phase \d+:", path: "HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md", output_mode: "content")
+  ⎿  Found 33 lines (ctrl+o to expand)
+
+⏺ Bash(wc -l "/Volumes/Data001/Hospital MS Dev/hms-backend/HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md")
+  ⎿      9919 /Volumes/Data001/Hospital MS Dev/hms-backend/HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md
+
+⏺ Read(HMS_Claude_Code_Prompts_Complete_Guide_Firs_Update.md)
+  ⎿  Read 220 lines
+
+⏺ Analysis Summary: HMS Guide Updates (Phase 8 onwards)
+
+  Guide Version: 2.0 - Last Updated January 2025
+  Total Length: 9,919 lines
+  Total Phases: 33 phases (expanded from previous version)
+
+  Key Findings:
+
+  1. Phase 7.14: Financial & Coverage Resources (NEW SATUSEHAT Phase)
+  This is a NEW phase between Phase 7.13 (just completed) and Phase 8. It covers FHIR resources for financial transactions and insurance:
+
+  - Coverage Resource: Insurance information (BPJS cards, classes)
+  - CoverageEligibilityRequest: SEP request for BPJS verification
+  - CoverageEligibilityResponse: SEP response with benefits
+  - Account Resource: Patient billing accounts
+  - ChargeItem Resource: Individual service charges
+  - Invoice Resource: Consolidated billing invoices
+  - Claim Resource: Insurance claims with items
+  - ClaimResponse Resource: Insurer claim adjudication
+  - PaymentReconciliation Resource: Payment tracking
+  - PaymentNotice Resource: Payment notifications
+
+  This phase integrates with:
+  - BPJS SEP workflow
+  - INA-CBGs grouper codes
+  - Financial dashboards
+
+  2. Phase 8: Billing Module (Starting point you selected)
+
+  8.1 Billing Structure:
+  - Service tariff master data
+  - Room charges calculation
+  - Doctor fees structure
+  - Procedure costs
+  - Medicine charges from pharmacy
+  - Laboratory test fees
+  - Radiology examination costs
+  - Package deals configuration
+  - Multiple payment types (cash, insurance, company)
+
+  8.2 Invoice Generation:
+  - Automatic charge compilation
+  - Discount/tax calculation
+  - Deposit deduction
+  - PDF invoice generation
+  - Invoice void/correction
+
+  8.3 Payment Processing:
+  - Multiple payment methods (cash, card, transfer, QRIS)
+  - Partial payments
+  - Payment receipt generation
+  - Cash register integration
+  - Refund handling
+
+  8.4 Insurance Claim Management (non-BPJS):
+  - Insurance company master data
+  - Coverage verification
+  - Claim forms
+  - Status tracking
+  - COB (Coordination of Benefits)
+
+  3. New Phases Added (Phase 14-33):
+
+  - Phase 14: Newborn/Perinatology Module
+  - Phase 15: Integration Hub Module
+  - Phase 16: Security & Authentication
+  - Phase 17: Reporting & Analytics
+  - Phase 18-19: React Frontend
+  - Phase 20: Testing Strategy
+  - Phase 21-22: Deployment
+  - Phase 23: Post-Production
+  - Phase 24: Advanced Features
+  - Phase 25: Compliance and Quality
+  - Phase 26: Critical Care & Support Services
+  - Phase 27: Medical Records & Quality Management
+  - Phase 28: Indonesian Regulatory Compliance
+  - Phase 29: Financial & Procurement System
+  - Phase 30: Patient Engagement & Digital Access
+  - Phase 31: Specialized Clinical Services
+  - Phase 32: Hospital Operations Management
+  - Phase 33: Support Services & Infrastructure
+
+  Recommendation:
+
+  Before implementing Phase 8 (Billing), you should implement Phase 7.14 (Financial & Coverage Resources) because:
+
+  1. Phase 7.14 provides FHIR resources (Coverage, ChargeItem, Invoice, Claim) that form the foundation for Phase 8's billing system
+  2. The SATUSEHAT financial resources integrate directly with BPJS claims processing
+  3. Phase 8 will reference these FHIR resources for insurance billing
+  4. Logical progression: SATUSEHAT financial APIs → Internal billing system
+
+  Would you like me to implement Phase 7.14: Financial & Coverage Resources first, or proceed directly with Phase 8: Billing Module?
+
+> yes
+
+
