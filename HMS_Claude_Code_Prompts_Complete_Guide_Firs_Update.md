@@ -606,7 +606,7 @@ Data Retention:
 ```
 
 ---
-DI SINI SAMAINYA==
+
 ## Phase 4: Clinical Module
 
 ### 4.1 Medical Record Structure

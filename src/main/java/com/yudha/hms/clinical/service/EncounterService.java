@@ -179,38 +179,11 @@ public class EncounterService {
         Encounter encounter = findEncounterById(id);
         EncounterStatus oldStatus = encounter.getStatus();
 
-        // Validate status transition
-        validateStatusTransition(oldStatus, newStatus);
+        // Use the encounter state machine - handles validation, business rules, and status history
+        encounter.changeStatus(newStatus, reason, getCurrentUser(), getCurrentUserId());
 
-        // Update status
-        encounter.setStatus(newStatus);
-
-        // Handle status-specific logic
-        switch (newStatus) {
-            case ARRIVED:
-                encounter.markAsArrived();
-                break;
-            case TRIAGED:
-                encounter.markAsTriaged();
-                break;
-            case IN_PROGRESS:
-                encounter.startEncounter();
-                break;
-            case FINISHED:
-                encounter.finishEncounter();
-                break;
-            case CANCELLED:
-                if (reason == null || reason.isEmpty()) {
-                    throw new ValidationException("Cancellation reason is required");
-                }
-                encounter.cancelEncounter(reason, getCurrentUser());
-                break;
-        }
-
+        // Save encounter (status history is cascade persisted)
         encounter = encounterRepository.save(encounter);
-
-        // Add status history
-        addStatusHistory(encounter, oldStatus, newStatus, reason, null);
 
         log.info("Encounter status updated from {} to {}", oldStatus, newStatus);
 
@@ -226,17 +199,12 @@ public class EncounterService {
 
     /**
      * Finish encounter.
-     * Validates business rules before finishing.
+     * Business rules are validated by the encounter state machine.
      */
     public EncounterResponse finishEncounter(UUID id) {
         log.info("Finishing encounter: {}", id);
-
-        Encounter encounter = findEncounterById(id);
-
-        // Validate business rules before finishing
-        validateEncounterBeforeFinish(encounter);
-
-        return updateStatus(id, EncounterStatus.FINISHED, "Encounter finished");
+        // Business rules are validated automatically in updateStatus -> changeStatus
+        return updateStatus(id, EncounterStatus.FINISHED, "Encounter selesai");
     }
 
     /**
