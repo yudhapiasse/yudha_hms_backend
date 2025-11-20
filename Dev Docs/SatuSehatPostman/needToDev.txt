@@ -1,0 +1,25 @@
+
+/Volumes/Data001/Hospital MS Dev/hms-backend/Dev Docs/SatuSehatPostman/Environments
+
+
+Resources need to implementing base on /Volumes/Data001/Hospital MS Dev/hms-backend/Dev Docs/SatuSehatPostman/Collections/00. FHIR Resource - Contoh Penggunaan.postman_collection.json
+they are:
+- Encounter
+- Condition
+- Observation
+- Procedure
+- Composition
+- Medication
+- MedicationRequest
+- MedicationDispense
+- AllergyIntolerance
+- ImagingStudy
+- ServiceRequest
+- ClinicalImpression
+- Immunization
+- QuestionnaireResponse
+- MedicationStatement
+- CarePlan
+- Specimen
+- DiagnosticReport
+- EpisodeOfCare

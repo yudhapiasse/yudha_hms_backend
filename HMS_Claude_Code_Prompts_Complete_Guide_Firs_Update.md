@@ -898,263 +898,985 @@ Build electronic medical record integration with BPJS:
 Implement with proper data encryption and audit logging
 ```
 
-### 5.8 Claim Processing & INA-CBGs
+
+## Phase 6: Claim Processing & INA-CBGs
+
 ```
-Build comprehensive E-Klaim 5.10.x Web Service integration for claim processing:
+Build comprehensive E-Klaim 5.10.x Web Service integration for claim processing based on official Ministry of Health E-Klaim Web Service Manual:
 
-1. E-Klaim Web Service Setup:
-   - Configure web service URL and credentials
-   - Implement AES-256-CBC encryption for all API communications
-   - Generate and manage encryption keys (16-byte key, 16-byte IV)
-   - Implement HMAC-SHA256 signatures for data integrity
-   - Handle JSON request/response with base64 encoding
+1. E-Klaim Web Service Configuration:
 
-   Key Configuration:
-   - ws_server: Web service endpoint URL
-   - cons_id: Consumer ID from E-Klaim
-   - secret_key: Secret key for encryption
-   - user_key: User authentication key (kodeinacbg from aplikasi table)
+   Endpoint Setup:
+   - Base URL: http://[alamat_server_aplikasi]/E-Klaim/ws.php
+   - Protocol: HTTP POST with JSON payload
+   - Encryption: AES-256-CBC with HMAC-SHA256 signature
+   - Character Encoding: UTF-8
 
-2. Core API Methods Implementation:
+   Required Credentials (from aplikasi table in E-Klaim):
+   - cons_id: Consumer ID (kodeinacbg)
+   - secret_key: 32-byte encryption key (256-bit, hex format)
+   - user_key: User authentication key
 
-   a. Claim Initialization:
-      - new_claim(): Create new claim with patient data
-      - set_claim_data(): Update claim details progressively
-      - claim_print(): Generate claim printout
+   Key Generation Process:
+   - Generate 256-bit random key using secure random generator
+   - Convert to hexadecimal format (64 characters)
+   - Store securely in hospital configuration
+   - Register key hash in E-Klaim aplikasi table
+   - Never transmit raw key over network
 
-   b. Grouper Operations:
-      - grouper_idrg(): Process iDRG grouping for diagnoses
-        * Input: nomor_sep, diagnosa codes (principal + secondary)
-        * Output: iDRG code, description, tariff components
-      - grouper_inacbg(): Process INACBG grouping for complete case
-        * Input: Full patient data, procedures, diagnoses
-        * Output: INACBG code, tariffs, special CMG flags
+2. Encryption/Decryption Implementation (Critical):
 
-   c. Claim Finalization:
-      - finalisasi_claim(): Submit final claim for processing
-      - send_claim_individual(): Send individual claims to BPJS
-      - send_claim_batch(): Batch submission for multiple claims
+   PHP Implementation (Primary Reference):
+   ```php
+   function inacbg_encrypt($data, $key) {
+       $key = hex2bin($key);
+       if (mb_strlen($key, "8bit") !== 32) {
+           throw new Exception("Needs a 256-bit key!");
+       }
+       $iv_size = openssl_cipher_iv_length("aes-256-cbc");
+       $iv = openssl_random_pseudo_bytes($iv_size);
 
-   d. Claim Management:
-      - get_claim_data(): Retrieve claim details
-      - delete_claim(): Remove draft claims
-      - reedit_claim(): Reopen finalized claims for correction
-      - claim_jkn(): Process JKN (BPJS) specific claims
+       // Encrypt data
+       $encrypted = openssl_encrypt($data, "aes-256-cbc", $key, OPENSSL_RAW_DATA, $iv);
 
-3. Data Validation & Error Handling:
+       // Generate HMAC signature (10 bytes)
+       $signature = mb_substr(hash_hmac("sha256", $encrypted, $key, true), 0, 10, "8bit");
 
-   Error Code Categories:
-   - 200: Success
-   - 201-299: Field-specific validation errors
-   - 300-399: Business logic errors
-   - 400-499: Authorization/authentication errors
-   - 500-599: System/server errors
+       // Combine: signature + iv + encrypted data
+       $encoded = chunk_split(base64_encode($signature . $iv . $encrypted));
 
-   Common Validations:
-   - Diagnosa code verification (ICD-10)
-   - Procedure code validation (ICD-9-CM)
-   - SEP number format checking
-   - Date range validations
-   - Tariff limit checks
+       return $encoded;
+   }
 
-4. Special Integration Workflows:
+   function inacbg_decrypt($data, $key) {
+       $key = hex2bin($key);
+       if (mb_strlen($key, "8bit") !== 32) {
+           throw new Exception("Needs a 256-bit key!");
+       }
 
-   a. SITB (TB Patient System):
-      - sitb_list_task(): Get TB patient task list
-      - sitb_apply_task(): Apply TB treatment tasks
-      - sitb_update_task(): Update treatment progress
-      - sitb_finish_task(): Complete TB treatment cycle
-      - sitb_list_rujukan(): Manage TB referrals
+       $data = base64_decode($data);
 
-   b. Special CMG Processing:
-      - Handle COVID-19 claims (special_cmg flags)
-      - Process chronic disease top-ups
-      - Calculate special procedure additional tariffs
-      - Manage upgrade class differentials
+       // Extract components
+       $signature = mb_substr($data, 0, 10, "8bit");
+       $iv = mb_substr($data, 10, 16, "8bit");
+       $encrypted = mb_substr($data, 26, null, "8bit");
 
-5. Encryption/Decryption Implementation:
+       // Verify signature
+       $calculated_sig = mb_substr(hash_hmac("sha256", $encrypted, $key, true), 0, 10, "8bit");
+       if (!hash_equals($signature, $calculated_sig)) {
+           throw new Exception("Signature verification failed!");
+       }
 
-   Request Encryption:
-   ```python
-   # AES-256-CBC encryption
-   cipher = AES.new(key.encode(), AES.MODE_CBC, iv.encode())
-   encrypted = base64.b64encode(cipher.encrypt(pad(json_data)))
+       // Decrypt data
+       $decrypted = openssl_decrypt($encrypted, "aes-256-cbc", $key, OPENSSL_RAW_DATA, $iv);
 
-   # Generate signature
-   signature = hmac.new(secret_key.encode(), encrypted, hashlib.sha256).digest()
-   request_data = base64.b64encode(json.dumps({
-       "data": encrypted.decode(),
-       "signature": base64.b64encode(signature).decode()
-   }))
+       return $decrypted;
+   }
    ```
 
-   Response Decryption:
+   Python Implementation:
    ```python
-   # Verify signature
-   received_signature = base64.b64decode(response["signature"])
-   expected_signature = hmac.new(secret_key.encode(), response["data"], hashlib.sha256).digest()
+   from Crypto.Cipher import AES
+   from Crypto.Random import get_random_bytes
+   import hmac
+   import hashlib
+   import base64
 
-   # Decrypt data
-   cipher = AES.new(key.encode(), AES.MODE_CBC, iv.encode())
-   decrypted = unpad(cipher.decrypt(base64.b64decode(response["data"])))
+   def inacbg_encrypt(data, key_hex):
+       key = bytes.fromhex(key_hex)
+       if len(key) != 32:
+           raise ValueError("Needs a 256-bit key!")
+
+       iv = get_random_bytes(16)
+       cipher = AES.new(key, AES.MODE_CBC, iv)
+
+       # Pad data to 16-byte blocks
+       padding_length = 16 - (len(data) % 16)
+       padded_data = data + (chr(padding_length) * padding_length)
+
+       encrypted = cipher.encrypt(padded_data.encode())
+
+       # Generate HMAC signature (10 bytes)
+       signature = hmac.new(key, encrypted, hashlib.sha256).digest()[:10]
+
+       # Combine and encode
+       combined = signature + iv + encrypted
+       return base64.b64encode(combined).decode()
+
+   def inacbg_decrypt(data, key_hex):
+       key = bytes.fromhex(key_hex)
+       if len(key) != 32:
+           raise ValueError("Needs a 256-bit key!")
+
+       decoded = base64.b64decode(data)
+
+       # Extract components
+       signature = decoded[:10]
+       iv = decoded[10:26]
+       encrypted = decoded[26:]
+
+       # Verify signature
+       calculated_sig = hmac.new(key, encrypted, hashlib.sha256).digest()[:10]
+       if signature != calculated_sig:
+           raise ValueError("Signature verification failed!")
+
+       cipher = AES.new(key, AES.MODE_CBC, iv)
+       decrypted = cipher.decrypt(encrypted)
+
+       # Remove padding
+       padding_length = decrypted[-1]
+       return decrypted[:-padding_length].decode()
    ```
 
-6. Claim Status Tracking:
+3. Complete Web Service Method Catalog (33 Methods):
 
-   Status Codes:
-   - 1: Draft (editable)
-   - 2: Finalized (locked for submission)
-   - 3: Sent to BPJS
-   - 4: Verified by BPJS
-   - 5: Paid
-   - 6: Rejected (requires correction)
-   - 7: Pending verification
-   - 8: CBG review needed
+   A. Claim Management (Core):
+      1. new_claim
+         - Purpose: Initialize new claim with patient demographics
+         - Input: nomor_sep, patient data, admission details
+         - Output: claim_number for tracking
+         - Used: Start of every claim process
 
-   Monitoring Methods:
-   - get_claim_status(): Check individual claim status
-   - monitoring_klaim(): Batch status monitoring
-   - get_status_verifikasi(): Detailed verification status
+      2. set_claim_data
+         - Purpose: Progressive update of claim information
+         - Input: claim_number, field_name, field_value pairs
+         - Output: Success confirmation
+         - Used: Build claim data incrementally
 
-7. Financial Reconciliation:
+      3. get_claim_data
+         - Purpose: Retrieve current claim information
+         - Input: claim_number or nomor_sep
+         - Output: Complete claim JSON
+         - Used: Review before finalization
+
+      4. delete_claim
+         - Purpose: Remove draft claims
+         - Input: claim_number
+         - Output: Deletion confirmation
+         - Restriction: Only for draft status (status=1)
+
+      5. reedit_claim
+         - Purpose: Reopen finalized claim for correction
+         - Input: claim_number
+         - Output: New draft claim_number
+         - Used: Fix rejected claims
+
+   B. Diagnosis & Procedure Data Entry:
+      6. diagnosa_inagrouper
+         - Purpose: Add primary diagnosis to claim
+         - Input: claim_number, icd10_code, diagnosa_primer=true
+         - Output: Diagnosis entry confirmation
+
+      7. diagnosa_sekunder
+         - Purpose: Add secondary diagnoses
+         - Input: claim_number, icd10_code array
+         - Output: Batch entry confirmation
+
+      8. procedure_inagrouper
+         - Purpose: Add primary procedure
+         - Input: claim_number, icd9cm_code, procedure_primer=true
+         - Output: Procedure entry confirmation
+
+      9. procedure_sekunder
+         - Purpose: Add secondary procedures
+         - Input: claim_number, icd9cm_code array
+         - Output: Batch entry confirmation
+
+      10. diagnosa_set
+          - Purpose: Set complete diagnosis set at once
+          - Input: claim_number, diagnosis_array with ICD-10 codes
+          - Output: Full set confirmation
+          - Used: Efficient bulk diagnosis entry
+
+      11. procedure_set
+          - Purpose: Set complete procedure set at once
+          - Input: claim_number, procedure_array with ICD-9-CM codes
+          - Output: Full set confirmation
+          - Used: Efficient bulk procedure entry
+
+   C. Grouper Operations (Two-Stage Process):
+
+      STAGE 1 - iDRG Grouping:
+      12. grouper (with grouper_type="idrg")
+          - Purpose: Process Indonesian DRG grouping
+          - Input: claim_number, patient data, diagnoses
+          - Output: iDRG code, base_tariff, components
+          - Required: Before INACBG grouping
+
+      STAGE 2 - INACBG Grouping:
+      13. grouper (with grouper_type="inacbg", stage="1")
+          - Purpose: First stage INACBG grouping
+          - Input: claim_number, complete case data
+          - Output: Preliminary CBG code
+
+      14. grouper (with grouper_type="inacbg", stage="2")
+          - Purpose: Final INACBG grouping with pricing
+          - Input: claim_number from stage 1
+          - Output: Final CBG code, tariff breakdown
+          - Components: base_tariff, top_up_covid, top_up_chronic,
+                       upgrade_class, special_cmg, special_prosthesis, special_drug
+
+      15. grouper_final
+          - Purpose: Lock grouper results
+          - Input: claim_number, grouper_type
+          - Output: Finalization status
+          - Effect: Prevents re-grouping
+
+   D. Special CMG & Prosthesis:
+      16. special_cmg_option
+          - Purpose: Get available special CMG options
+          - Input: cbg_code, hospital_class
+          - Output: Array of special CMG codes with tariffs
+          - Cases: COVID-19, complex procedures, rare conditions
+
+      17. claim_prosthesis
+          - Purpose: Add prosthesis/implant to claim
+          - Input: claim_number, prosthesis_code, quantity, price
+          - Output: Prosthesis entry confirmation
+          - Tariff Impact: Additional reimbursement calculation
+
+   E. Claim Finalization & Submission:
+      18. claim_final
+          - Purpose: Finalize claim for submission
+          - Input: claim_number
+          - Output: Final claim package
+          - Validation: Complete data check, grouping verified
+          - Status Change: Draft (1) → Finalized (2)
+
+      19. send_claim_individual
+          - Purpose: Submit single claim to BPJS
+          - Input: claim_number
+          - Output: Submission receipt number
+          - Status Change: Finalized (2) → Sent (3)
+
+      20. send_claim_reconsider
+          - Purpose: Resubmit corrected rejected claim
+          - Input: claim_number, correction_notes
+          - Output: New submission receipt
+
+      21. pending_claim
+          - Purpose: List all pending finalized claims
+          - Input: start_date, end_date, status_filter
+          - Output: Array of pending claims
+
+   F. Claim Monitoring & Status:
+      22. get_claim_status
+          - Purpose: Check individual claim status
+          - Input: claim_number or nomor_sep
+          - Output: Current status, verifier notes, payment status
+
+      23. monitoring_klaim
+          - Purpose: Batch claim monitoring
+          - Input: month, year, claim_status filter
+          - Output: Summary statistics, claim list
+
+      24. get_data_klaim
+          - Purpose: Retrieve detailed claim data with history
+          - Input: claim_number
+          - Output: Complete audit trail
+
+   G. Financial & Payment:
+      25. claim_ba
+          - Purpose: Process payment batch acknowledgment (Berita Acara)
+          - Input: ba_number, claim_list
+          - Output: Payment confirmation
+          - Status Change: Verified (4) → Paid (5)
+
+      26. get_data_base_plafon
+          - Purpose: Check remaining budget ceiling
+          - Input: month, year, payer_type
+          - Output: Total ceiling, used amount, remaining
+
+      27. get_data_pantauan_jkn
+          - Purpose: JKN claim monitoring dashboard
+          - Input: date_range, facility_code
+          - Output: Submission stats, approval rates, payment summary
+
+   H. SITB Integration (TB Cases - MANDATORY):
+      28. sitb_list_task
+          - Purpose: Get TB treatment task list from SITB
+          - Input: nomor_sep
+          - Output: Array of required TB tasks
+          - Required: For all TB diagnosis (ICD-10: A15-A19)
+
+      29. sitb_apply_task
+          - Purpose: Apply SITB tasks to claim
+          - Input: claim_number, task_id array
+          - Output: Task application confirmation
+
+      30. sitb_update_task
+          - Purpose: Update TB treatment progress
+          - Input: claim_number, task_id, status, result
+          - Output: Update confirmation
+
+      31. sitb_finish_task
+          - Purpose: Complete TB treatment cycle
+          - Input: claim_number
+          - Output: Treatment completion status
+          - Effect: Enables claim finalization
+
+      32. sitb_list_rujukan
+          - Purpose: Manage TB patient referrals
+          - Input: patient_id
+          - Output: Referral history and status
+
+   I. Utility & Reporting:
+      33. claim_print
+          - Purpose: Generate claim printout for hospital records
+          - Input: claim_number, format (PDF/HTML)
+          - Output: Formatted claim document
+          - Contains: All claim data, grouping results, tariff breakdown
+
+4. Complete Integration Flow (MANDATORY SEQUENCE):
+
+   Basic Flow (Non-TB Cases):
+   ```
+   START
+     ↓
+   1. new_claim(sep_data, patient_data)
+     → Returns: claim_number
+     ↓
+   2. set_claim_data(claim_number, admission_data, billing_data)
+     → Progressive data entry
+     ↓
+   3. diagnosa_set(claim_number, [primary_icd10, secondary_icd10...])
+     → Set all diagnoses
+     ↓
+   4. procedure_set(claim_number, [primary_icd9, secondary_icd9...])
+     → Set all procedures
+     ↓
+   5. iDRG GROUPING STAGE:
+      a. grouper(claim_number, grouper_type="idrg")
+         → Returns: idrg_code, idrg_tariff
+      b. grouper_final(claim_number, grouper_type="idrg")
+         → Locks iDRG result
+     ↓
+   6. INACBG GROUPING STAGE:
+      a. grouper(claim_number, grouper_type="inacbg", stage="1")
+         → Returns: preliminary_cbg_code
+      b. grouper(claim_number, grouper_type="inacbg", stage="2")
+         → Returns: final_cbg_code, tariff_components
+      c. [OPTIONAL] special_cmg_option(cbg_code)
+         → Check for applicable special CMG
+      d. [OPTIONAL] claim_prosthesis(claim_number, prosthesis_data)
+         → Add prosthesis if applicable
+      e. grouper_final(claim_number, grouper_type="inacbg")
+         → Locks INACBG result
+     ↓
+   7. claim_final(claim_number)
+     → Validates and finalizes claim
+     → Status: 1 (Draft) → 2 (Finalized)
+     ↓
+   8. send_claim_individual(claim_number)
+     → Submits to BPJS
+     → Status: 2 (Finalized) → 3 (Sent)
+     ↓
+   9. monitoring_klaim(month, year)
+     → Track verification progress
+     → Wait for Status: 4 (Verified)
+     ↓
+   10. claim_ba(ba_number, [claim_numbers])
+      → Process payment
+      → Status: 4 (Verified) → 5 (Paid)
+     ↓
+   END
+   ```
+
+   SITB Flow (TB Diagnosis Cases - ICD-10: A15-A19):
+   ```
+   START
+     ↓
+   1-4. [Same as Basic Flow: new_claim → set_claim_data → diagnosa_set → procedure_set]
+     ↓
+   5. SITB VALIDATION (MANDATORY for TB cases):
+      a. sitb_list_task(nomor_sep)
+         → Returns: required_tasks array from SITB system
+      b. sitb_apply_task(claim_number, task_ids)
+         → Apply mandatory TB tasks
+      c. sitb_update_task(claim_number, task_id, status="completed")
+         → Update each task progress
+      d. sitb_finish_task(claim_number)
+         → Complete SITB validation
+         → Required before grouping
+     ↓
+   6-10. [Continue with Basic Flow: iDRG grouping → INACBG grouping → finalization → submission]
+     ↓
+   END
+   ```
+
+   Error Recovery Flow:
+   ```
+   If claim rejected (Status: 6):
+     ↓
+   1. get_claim_status(claim_number)
+      → Review rejection reason
+     ↓
+   2. reedit_claim(claim_number)
+      → Creates new editable claim_number
+      → Copies data from rejected claim
+     ↓
+   3. [Make corrections]:
+      - set_claim_data(new_claim_number, corrected_data)
+      - diagnosa_set(new_claim_number, corrected_diagnoses)
+      - procedure_set(new_claim_number, corrected_procedures)
+     ↓
+   4. [Re-run grouping]:
+      - iDRG grouping stage
+      - INACBG grouping stage
+     ↓
+   5. claim_final(new_claim_number)
+     ↓
+   6. send_claim_reconsider(new_claim_number, correction_notes)
+     ↓
+   Monitor until verified
+   ```
+
+5. Error Handling & Response Codes:
+
+   E-Klaim Specific Error Codes (E2xxx series):
+   - E2001: Encryption/decryption failure
+   - E2002: Invalid signature - data integrity compromised
+   - E2003: Consumer ID not found or inactive
+   - E2004: User key authentication failed
+   - E2005: Invalid claim_number reference
+   - E2006: Claim already finalized - cannot edit
+   - E2007: Required field missing
+   - E2008: Invalid ICD-10 diagnosis code
+   - E2009: Invalid ICD-9-CM procedure code
+   - E2010: Duplicate diagnosis entry
+   - E2011: Duplicate procedure entry
+   - E2012: Grouping failed - incomplete data
+   - E2013: iDRG grouping required before INACBG
+   - E2014: SITB validation incomplete (TB cases)
+   - E2015: SEP number not found in VClaim
+   - E2016: SEP already used for another claim
+   - E2017: Claim date outside SEP validity period
+   - E2018: Hospital not authorized for service type
+   - E2019: Patient class mismatch with SEP
+   - E2020: Invalid tariff calculation
+   - E2021-E2099: Reserved for future error codes
+
+   Ungroupable/Unrelated Codes (36xxxx series):
+   - 36.0000: Incomplete diagnosis information
+   - 36.0001: Invalid age for diagnosis
+   - 36.0002: Gender mismatch with diagnosis
+   - 36.0003: Length of stay inconsistent with diagnosis
+   - 36.0004: Procedure not related to diagnosis
+   - 36.0005: Missing required secondary diagnosis
+   - 36.0006: Invalid principal diagnosis for admission type
+   - 36.0007: Diagnosis-procedure combination not allowed
+   - 36.0008: Birth weight missing for neonatal case
+   - 36.0009: Invalid admission source
+   - 36.0010: Missing required laboratory results
+   - 36.xxxx: Other ungroupable conditions
+
+   Standard HTTP/JSON Response:
+   ```json
+   {
+     "metadata": {
+       "code": "200",          // Success: "200", Error: "E2xxx" or "36xxxx"
+       "message": "Success" or "Error description"
+     },
+     "response": {
+       // Method-specific response data
+       "claim_number": "...",
+       "cbg_code": "...",
+       "tariff": {...},
+       // etc.
+     }
+   }
+   ```
+
+   Error Handling Strategy:
+   - E2001-E2004: Configuration/authentication errors → Check credentials
+   - E2005-E2012: Data validation errors → Review and correct data
+   - E2013-E2014: Process sequence errors → Follow correct flow
+   - E2015-E2020: Business logic errors → Verify SEP and eligibility
+   - 36.xxxx: Ungroupable cases → Clinical review required
+
+   Implement Retry Logic:
+   - Network errors: Exponential backoff (1s, 2s, 4s, 8s, 16s)
+   - E2001 errors: Re-encrypt and retry once
+   - E2012 errors: Complete missing data, retry grouping
+   - All others: Log and alert, manual intervention required
+
+6. Claim Status Tracking & Workflow:
+
+   Status Code Definitions:
+   - 1: Draft - Editable, data entry in progress
+   - 2: Finalized - Locked, ready for submission
+   - 3: Sent - Submitted to BPJS, awaiting verification
+   - 4: Verified - Approved by BPJS verifier
+   - 5: Paid - Payment processed
+   - 6: Rejected - Requires correction and resubmission
+   - 7: Pending - Additional information requested
+   - 8: Dispute - Under appeal review
+
+   Status Transition Rules:
+   - 1→2: claim_final() - Requires complete data + grouping
+   - 2→3: send_claim_individual() - One-way, cannot revert
+   - 3→4: BPJS verifier action - External process
+   - 3→6: BPJS rejection - Use reedit_claim()
+   - 3→7: BPJS pending request - Provide additional info
+   - 4→5: claim_ba() - Payment batch processing
+   - 6→2: After correction via reedit_claim() + claim_final()
+   - 7→8: If hospital disputes rejection
+
+   Monitoring Implementation:
+   ```php
+   // Individual claim tracking
+   function track_claim_status($claim_number) {
+       $status = get_claim_status($claim_number);
+
+       $status_actions = [
+           1 => "Complete data entry and finalize",
+           2 => "Submit claim to BPJS",
+           3 => "Wait for BPJS verification",
+           4 => "Wait for payment batch",
+           5 => "Claim completed - update billing",
+           6 => "Review rejection reason and correct",
+           7 => "Provide requested additional information",
+           8 => "Monitor dispute resolution process"
+       ];
+
+       log_status_change($claim_number, $status);
+       return $status_actions[$status['current_status']];
+   }
+
+   // Batch monitoring
+   function monitor_monthly_claims($month, $year) {
+       $stats = monitoring_klaim($month, $year);
+
+       return [
+           'total_claims' => $stats['total'],
+           'draft' => $stats['status_1'],
+           'finalized' => $stats['status_2'],
+           'sent' => $stats['status_3'],
+           'verified' => $stats['status_4'],
+           'paid' => $stats['status_5'],
+           'rejected' => $stats['status_6'],
+           'pending' => $stats['status_7'],
+           'dispute' => $stats['status_8'],
+           'verification_rate' => ($stats['status_4'] + $stats['status_5']) / $stats['status_3'] * 100,
+           'rejection_rate' => $stats['status_6'] / $stats['status_3'] * 100,
+           'average_verification_days' => $stats['avg_verification_time']
+       ];
+   }
+   ```
+
+7. Financial Reconciliation & Reporting:
 
    Payment Processing:
-   - claim_ba(): Process payment batch acknowledgment
-   - get_data_base_plafon(): Check remaining budget ceiling
-   - get_data_pantauan_jkn(): Monitor JKN claim statistics
+   a. Budget Ceiling Management:
+      ```php
+      // Check available budget before submission
+      $plafon = get_data_base_plafon($month, $year, $payer_type);
 
-   Reporting:
-   - Generate claim summary reports
-   - Track payment vs submission ratios
-   - Monitor rejection rates by type
-   - Calculate average processing times
+      if ($plafon['remaining'] < $claim_total_tariff) {
+          alert("Insufficient budget ceiling remaining");
+          // Hold claim or negotiate with BPJS
+      }
+      ```
 
-8. Advanced Features:
+   b. Batch Payment (Berita Acara):
+      - BPJS creates payment batch (BA) with claim list
+      - Hospital verifies BA contents
+      - Process payment acknowledgment:
+        ```php
+        claim_ba($ba_number, $verified_claim_numbers);
+        ```
+      - Update hospital billing system
+      - Generate financial reports
 
-   a. Pending Claims Management:
-      - pending_klaim(): List all pending claims
-      - claim_final(): Bulk finalization
-      - grouper_stage(): Progressive grouping for complex cases
+   c. JKN Monitoring Dashboard:
+      ```php
+      $dashboard = get_data_pantauan_jkn($start_date, $end_date);
 
-   b. Re-admission Handling:
-      - readmisi_ditolak(): Handle rejected readmissions
-      - readmisi_diterima(): Process approved readmissions
-      - claim_hemodialisa(): Special HD claim processing
+      // Key metrics:
+      - Total claims submitted
+      - Total claims verified
+      - Total tariff claimed vs approved
+      - Variance analysis (claimed vs approved amounts)
+      - Top rejection reasons
+      - Average claim value by CBG
+      - Case mix index (CMI) calculation
+      - Length of stay (LOS) analysis by CBG
+      ```
 
-   c. Integration Points:
-      - Pull SEP data from BPJS VClaim
-      - Push claim results to hospital billing
-      - Sync with SIMRS for patient data
-      - Export to hospital financial system
+   Financial Reports Required:
+   - Daily submission report
+   - Weekly verification status report
+   - Monthly payment reconciliation
+   - Quarterly case mix analysis
+   - Annual performance review
+   - Rejection trend analysis
+   - Budget utilization tracking
 
-9. Audit Trail Requirements:
+8. Advanced Features & Special Cases:
 
-   Log All Operations:
-   - API request/response pairs
-   - User actions with timestamps
-   - Claim state transitions
-   - Error occurrences with context
-   - Payment confirmations
-   - Data modifications history
+   a. Special CMG Handling:
+      - COVID-19 cases (2020-2023):
+        * Automatic top-up tariff
+        * Separate reporting category
+        * Extended LOS allowance
 
-   Compliance Tracking:
-   - Store encrypted copies of submitted claims
-   - Maintain verification documents
-   - Track approval chains
-   - Document rejection resolutions
+      - Chronic disease top-ups:
+        * Diabetes with complications
+        * Chronic kidney disease
+        * Cancer treatments
+        * Cardiac cases
 
-10. Performance Optimization:
+      - Special prosthesis/implants:
+        * Joint replacements
+        * Cardiac stents
+        * Pacemakers
+        * Intraocular lenses
+        * Additional reimbursement beyond CBG tariff
 
-    - Implement request queuing for batch operations
-    - Cache frequently used reference data (ICD codes, tariffs)
-    - Use connection pooling for API calls
-    - Implement retry logic with exponential backoff
-    - Monitor API rate limits (default: 1000 req/hour)
-    - Optimize large claim batches (max 100 claims/batch)
+   b. Hemodialysis Claims:
+      - Special method: claim_hemodialisa()
+      - Chronic HD: Monthly package rate
+      - Acute HD: Per-session billing
+      - Automated session counting
+      - Supplies tracking
 
-Store all E-Klaim transactions with complete audit trail including request/response data, timestamps, and user actions
+   c. Re-admission Handling:
+      - readmisi_diterima(): Approved re-admission within 3 days
+        * No new CBG grouping
+        * Extended LOS on original claim
+        * Combine tariffs
+
+      - readmisi_ditolak(): Rejected re-admission
+        * Treated as new admission
+        * Separate claim number
+        * Full grouping process
+
+   d. Multi-stage Procedures:
+      - Some procedures require multiple admissions
+      - Stage tracking in claim_data
+      - Cumulative tariff calculation
+      - Completion confirmation required
+
+9. Integration Points & Data Flow:
+
+   Hospital Information System Integration:
+
+   a. From VClaim (BPJS SEP System):
+      - Pull SEP data automatically
+      - Validate SEP before claim creation
+      - Extract: nomor_sep, patient_id, poli, diagnosis_awal, etc.
+      - Sync SEP status changes
+
+   b. From Hospital SIMRS:
+      - Patient demographics
+      - Admission/discharge dates and times
+      - Attending physician information
+      - Final diagnoses (ICD-10)
+      - Procedures performed (ICD-9-CM)
+      - Laboratory results
+      - Medications administered
+      - Billing/cost data
+
+   c. To Hospital Billing System:
+      - CBG codes and tariffs
+      - Top-up amounts
+      - Special CMG additions
+      - Payment status updates
+      - Rejection notifications
+      - Financial variance (billed vs approved)
+
+   d. To Hospital Financial System:
+      - Monthly payment summaries
+      - Accounts receivable updates
+      - Budget utilization reports
+      - Revenue forecasting data
+
+   Data Synchronization Strategy:
+   - Real-time: SEP validation, claim status changes
+   - Hourly: New patient admissions, discharge updates
+   - Daily: Batch claim submissions, payment updates
+   - Weekly: Reconciliation reports
+   - Monthly: Financial closing, case mix analysis
+
+10. Audit Trail & Compliance Requirements:
+
+    Mandatory Logging (Per Ministry of Health Regulations):
+
+    a. API Transaction Logs:
+       - Timestamp (server time + local time)
+       - Method called
+       - Request payload (encrypted + decrypted versions)
+       - Response received (full JSON)
+       - User who initiated request
+       - IP address and client identifier
+       - Execution time
+       - Success/failure status
+       - Error codes if applicable
+
+    b. Claim Lifecycle Events:
+       - Creation timestamp and user
+       - Each data modification with old→new values
+       - Grouping attempts and results
+       - Status transitions with reason codes
+       - Finalization timestamp
+       - Submission timestamp and receipt number
+       - Verification result and verifier notes
+       - Payment processing details
+       - Any corrections or re-edits
+
+    c. Security Events:
+       - Encryption failures
+       - Signature verification failures
+       - Authentication failures
+       - Unauthorized access attempts
+       - Configuration changes
+       - Key rotation events
+
+    d. Clinical Data Integrity:
+       - Original diagnosis codes vs final codes
+       - Original procedure codes vs final codes
+       - Grouping overrides (manual adjustments)
+       - Clinical coder identity and credentials
+       - Physician authentication for diagnoses
+
+    Retention Requirements:
+    - Active claims: Minimum 3 years
+    - Paid claims: Minimum 5 years
+    - Disputed claims: Minimum 7 years
+    - Audit logs: Minimum 3 years
+    - Financial reconciliation: Minimum 10 years
+
+    Compliance Features:
+    - Tamper-proof logging (write-once storage)
+    - Encrypted backup of all claim data
+    - Digital signatures for finalized claims
+    - Audit trail export for Ministry inspection
+    - Access control logs (who viewed what when)
+
+11. Performance Optimization & Best Practices:
+
+    a. Request Rate Management:
+       - Implement request queue with priority levels
+       - Rate limit: ~50-100 requests/minute recommended
+       - Use batch methods when available
+       - Monitor E-Klaim server response times
+       - Implement circuit breaker for server downtime
+
+    b. Caching Strategy:
+       - ICD-10 diagnosis codes: Cache 24 hours
+       - ICD-9-CM procedure codes: Cache 24 hours
+       - CBG tariff tables: Cache until version update
+       - Special CMG options: Cache 1 hour
+       - SEP data: Cache 15 minutes
+       - Never cache: Claim status, grouping results
+
+    c. Database Optimization:
+       - Index on: claim_number, nomor_sep, status, submission_date
+       - Partition large tables by month/year
+       - Archive old claims (>1 year) to separate storage
+       - Regular VACUUM/ANALYZE operations
+
+    d. Batch Processing:
+       - Group claim submissions in batches of 10-50
+       - Schedule batch processing during off-peak hours
+       - Parallel processing for independent operations
+       - Sequential processing for dependent operations (grouping stages)
+
+    e. Error Recovery:
+       - Automatic retry for network errors (max 3 attempts)
+       - Exponential backoff: 1s, 2s, 4s
+       - Dead letter queue for persistent failures
+       - Manual intervention alerts for critical errors
+       - Transaction rollback for partial failures
+
+    f. Monitoring & Alerting:
+       - Track API response times (alert if >5 seconds)
+       - Monitor encryption/decryption performance
+       - Alert on rejection rate >15%
+       - Track ungroupable cases (>5% requires review)
+       - Dashboard for real-time submission status
+       - Daily summary reports to management
+
+12. Testing & Validation Requirements:
+
+    a. Integration Testing Checklist:
+       - [ ] Encryption/decryption with test keys
+       - [ ] Each of 33 web service methods
+       - [ ] Complete basic flow (non-TB case)
+       - [ ] Complete SITB flow (TB case)
+       - [ ] Error handling for all E2xxx codes
+       - [ ] Ungroupable case handling (36xxxx)
+       - [ ] Status transition workflows
+       - [ ] Payment batch processing
+       - [ ] Re-admission scenarios
+       - [ ] Special CMG cases
+       - [ ] Prosthesis billing
+       - [ ] Hemodialysis claims
+
+    b. Test Data Requirements:
+       - Sample SEP numbers from test environment
+       - Valid test ICD-10 diagnosis codes
+       - Valid test ICD-9-CM procedure codes
+       - Test patient demographics
+       - Test encryption keys from E-Klaim team
+
+    c. Validation Rules:
+       - All claims must pass iDRG grouping before INACBG
+       - TB cases (A15-A19) must complete SITB validation
+       - SEP must be validated before claim creation
+       - Diagnosis codes must be active ICD-10
+       - Procedure codes must be active ICD-9-CM
+       - Dates must be within SEP validity period
+       - Patient class must match SEP
+       - Hospital must be authorized for service type
+
+    d. Performance Benchmarks:
+       - Encryption/decryption: <100ms per operation
+       - new_claim: <500ms response time
+       - Grouping operations: <2 seconds
+       - Claim finalization: <1 second
+       - Status check: <500ms
+       - Batch submission (50 claims): <30 seconds
+
+CRITICAL IMPLEMENTATION NOTES:
+- ALWAYS follow the two-stage grouping process (iDRG first, then INACBG)
+- NEVER skip SITB validation for TB diagnosis cases
+- ALWAYS verify signature on decryption (security requirement)
+- NEVER store unencrypted patient data in logs
+- ALWAYS maintain complete audit trail
+- Implement proper error handling for all 33 methods
+- Follow exact encryption specification (10-byte HMAC signature)
+- Use hex2bin for key conversion (64-char hex → 32-byte binary)
+- Respect claim status transitions (cannot edit finalized claims)
+- Monitor ungroupable rate (>5% indicates data quality issues)
+
+Store all E-Klaim transactions with complete audit trail including encrypted request/response data, signatures, timestamps, user actions, and full claim lifecycle events per Ministry of Health compliance requirements.
 ```
 
 ---
 
-## Phase 6: SATUSEHAT Integration
+## Phase 7: SATUSEHAT Integration
 
-### 6.1 SATUSEHAT OAuth2 Authentication Setup
+### 7.1 SATUSEHAT OAuth2 Authentication Setup
 ```
-Configure comprehensive SATUSEHAT OAuth2 authentication system:
+Configure comprehensive SATUSEHAT OAuth2 authentication system based on official API specs:
 
 1. Environment Configuration:
    Development/Sandbox:
    - Auth URL: https://api-satusehat-stg.dto.kemkes.go.id/oauth2/v1
    - FHIR Base URL: https://api-satusehat-stg.dto.kemkes.go.id/fhir-r4/v1
+   - Consent URL: https://api-satusehat-stg.dto.kemkes.go.id/consent/v1
    - Client ID: Obtained from SATUSEHAT registration
    - Client Secret: Encrypted storage required
+   - Organization ID: Test organization ID from sandbox
 
    Production:
    - Auth URL: https://api-satusehat.kemkes.go.id/oauth2/v1
    - FHIR Base URL: https://api-satusehat.kemkes.go.id/fhir-r4/v1
+   - Consent URL: https://api-satusehat.kemkes.go.id/consent/v1
    - Client ID: Production credentials from Ministry of Health
    - Client Secret: Must be secured with encryption
+   - Organization ID: Hospital's registered organization ID
 
 2. Token Management Implementation:
    a. Access Token Request:
-      POST /accesstoken?grant_type=client_credentials
-      Headers:
-      - Content-Type: application/x-www-form-urlencoded
-      Body:
-      - client_id={client_id}
-      - client_secret={client_secret}
+      POST {{auth_url}}/accesstoken?grant_type=client_credentials
+      Content-Type: application/x-www-form-urlencoded
 
-      Response:
+      Body Parameters:
+      - client_id={{client_id}}
+      - client_secret={{client_secret}}
+
+      Response Structure:
       {
-        "refresh_token_expires_in": "0",
-        "api_product_list": "[api-satusehat-prod]",
-        "api_product_list_json": ["api-satusehat-prod"],
-        "organization_name": "kemkes",
-        "token_type": "Bearer",
-        "issued_at": "1234567890000",
-        "client_id": "your-client-id",
-        "access_token": "eyJ...",
-        "application_name": "your-app-name",
-        "scope": "",
-        "expires_in": "3599",
-        "refresh_count": "0",
-        "status": "approved"
+        "resourceType": "Parameters",
+        "parameter": [
+          {
+            "name": "access_token",
+            "valueString": "eyJ..."
+          },
+          {
+            "name": "token_type",
+            "valueString": "Bearer"
+          },
+          {
+            "name": "expires_in",
+            "valueInteger": 3599
+          },
+          {
+            "name": "issued_at",
+            "valueString": "1234567890000"
+          }
+        ]
       }
 
-   b. Token Storage:
-      - Store in Redis with TTL
+   b. Token Storage Strategy:
+      - Store in Redis with TTL (expires_in - 300 seconds)
+      - Key format: "satusehat:token:{environment}"
       - Implement token refresh 5 minutes before expiry
-      - Cache token per environment
-      - Encrypt tokens at rest
+      - Cache token per environment (sandbox/production)
+      - Encrypt tokens at rest using AES-256
+      - Automatic renewal on expiry
 
-   c. Token Usage:
-      - Add to all API requests: Authorization: Bearer {access_token}
-      - Implement automatic retry with new token on 401
+   c. Token Usage Pattern:
+      - Add to all FHIR API requests: Authorization: Bearer {access_token}
+      - Implement automatic retry with new token on 401 Unauthorized
+      - Use middleware/interceptor for automatic token injection
+      - Handle concurrent requests during token refresh
 
-3. Rate Limiting & Throttling:
-   - Default: 100 requests per second
+3. API Endpoints Structure:
+   - Authentication: {{auth_url}}/accesstoken
+   - FHIR Resources: {{base_url}}/{resource}
+   - Consent Management: {{consent_url}}/Consent
+   - Search: {{base_url}}/{resource}?{searchParams}
+   - Read: {{base_url}}/{resource}/{id}
+   - Create: POST {{base_url}}/{resource}
+   - Update: PUT {{base_url}}/{resource}/{id}
+   - Patch: PATCH {{base_url}}/{resource}/{id}
+
+4. Rate Limiting & Throttling:
+   - Default: 100 requests per second per client
    - Burst: 1000 requests per minute
    - Implement request queue with rate limiter
    - Track API usage per endpoint
    - Implement circuit breaker for failures
+   - Exponential backoff on rate limit errors
 
-4. Organization Configuration:
+5. Organization Configuration:
    - Organization ID: Obtained from SATUSEHAT registration
-   - Location ID: For each facility/unit
-   - Practitioner IDs: For all healthcare providers
+   - Location IDs: For each facility/unit/department
+   - Practitioner IDs: For all healthcare providers (NIK-based)
    - Store in configuration with proper mapping
+   - Validate all IDs before API calls
 
-5. Error Handling:
-   - 401: Token expired - refresh automatically
-   - 403: Forbidden - check organization permissions
-   - 429: Rate limit exceeded - implement backoff
-   - 500-503: Server errors - retry with exponential backoff
+6. Error Handling Strategy:
+   - 400: Bad Request - Validate request format
+   - 401: Unauthorized - Refresh token automatically
+   - 403: Forbidden - Check organization permissions and scopes
+   - 404: Not Found - Resource doesn't exist
+   - 409: Conflict - Handle duplicate submissions
+   - 422: Unprocessable Entity - Validate FHIR resource structure
+   - 429: Too Many Requests - Implement backoff with retry
+   - 500-503: Server errors - Retry with exponential backoff (max 3 attempts)
 
-Include comprehensive logging for all authentication activities
+7. Logging & Monitoring:
+   - Log all authentication attempts
+   - Track token generation/renewal
+   - Monitor API response times
+   - Log all errors with request/response details
+   - Implement audit trail for all submissions
+   - Track API quota usage
+
+8. Security Best Practices:
+   - Never expose client_secret in logs or error messages
+   - Use environment variables for credentials
+   - Implement request signing for sensitive operations
+   - Validate all responses before processing
+   - Use HTTPS for all API calls
+   - Implement proper certificate validation
 ```
 
-### 6.2 Patient Resource Management
+### 7.2 Patient Resource Management
 ```
 Implement complete FHIR R4 Patient resource for SATUSEHAT:
 
@@ -1345,7 +2067,7 @@ Implement complete FHIR R4 Patient resource for SATUSEHAT:
 Include retry queue for failed patient submissions
 ```
 
-### 6.3 Encounter Resource Implementation
+### 7.3 Encounter Resource Implementation
 ```
 Build comprehensive Encounter management for SATUSEHAT:
 
@@ -1539,7 +2261,7 @@ Build comprehensive Encounter management for SATUSEHAT:
 Include comprehensive encounter tracking and reconciliation
 ```
 
-### 6.4 Clinical Resources Submission
+### 7.4 Clinical Resources Submission
 ```
 Implement complete clinical data submission to SATUSEHAT:
 
@@ -1950,7 +2672,7 @@ Implement complete clinical data submission to SATUSEHAT:
 Include comprehensive error handling and monitoring dashboard
 ```
 
-### 6.5 Organization and Location Resources
+### 7.5 Organization and Location Resources
 ```
 Implement Organization and Location management for SATUSEHAT:
 
@@ -2080,7 +2802,7 @@ Implement Organization and Location management for SATUSEHAT:
 Include location mapping for all service areas
 ```
 
-### 6.6 Practitioner and PractitionerRole Resources
+### 7.6 Practitioner and PractitionerRole Resources
 ```
 Manage healthcare provider data for SATUSEHAT:
 
@@ -2251,7 +2973,7 @@ Manage healthcare provider data for SATUSEHAT:
 Include practitioner synchronization with SATUSEHAT registry
 ```
 
-### 6.7 Diagnostic Report and Document Reference
+### 7.7 Diagnostic Report and Document Reference
 ```
 Implement diagnostic reporting and document management:
 
@@ -2413,7 +3135,7 @@ Implement diagnostic reporting and document management:
 Include document upload and retrieval workflows
 ```
 
-### 6.8 Monitoring and Reconciliation
+### 7.8 Monitoring and Reconciliation
 ```
 Build comprehensive SATUSEHAT monitoring system:
 
@@ -2487,7 +3209,7 @@ Build comprehensive SATUSEHAT monitoring system:
 Include automated reconciliation jobs and manual correction tools
 ```
 
-### 6.9 Implementation Best Practices
+### 7.9 Implementation Best Practices
 ```
 SATUSEHAT integration best practices and guidelines:
 
@@ -2550,11 +3272,2004 @@ SATUSEHAT integration best practices and guidelines:
 Include implementation timeline and milestone tracking
 ```
 
+### 7.10 Medication Resources
+```
+Implement comprehensive medication management resources:
+
+1. Medication Resource:
+   {
+     "resourceType": "Medication",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Medication"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/medication",
+         "value": "MED001"
+       }
+     ],
+     "code": {
+       "coding": [
+         {
+           "system": "http://sys-ids.kemkes.go.id/kfa",
+           "code": "93001019",
+           "display": "Amoxicillin 500 mg Kapsul"
+         }
+       ]
+     },
+     "status": "active",
+     "manufacturer": {
+       "reference": "Organization/pharm-company-123"
+     },
+     "form": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/medicationknowledge-package-type",
+           "code": "caps",
+           "display": "Capsule"
+         }
+       ]
+     },
+     "amount": {
+       "numerator": {
+         "value": 500,
+         "unit": "mg"
+       }
+     }
+   }
+
+2. MedicationRequest Resource (Prescription):
+   {
+     "resourceType": "MedicationRequest",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/MedicationRequest"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/prescription",
+         "value": "RX-20250120-001"
+       }
+     ],
+     "status": "active",  // active | on-hold | cancelled | completed | entered-in-error | stopped | draft | unknown
+     "intent": "order",   // proposal | plan | order | original-order | reflex-order | filler-order | instance-order | option
+     "category": [
+       {
+         "coding": [
+           {
+             "system": "http://terminology.hl7.org/CodeSystem/medicationrequest-category",
+             "code": "outpatient",
+             "display": "Outpatient"
+           }
+         ]
+       }
+     ],
+     "priority": "routine",
+     "medicationReference": {
+       "reference": "Medication/MED001",
+       "display": "Amoxicillin 500 mg Kapsul"
+     },
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "authoredOn": "2025-01-20T10:00:00+07:00",
+     "requester": {
+       "reference": "Practitioner/N10000001",
+       "display": "dr. John Doe, Sp.PD"
+     },
+     "dosageInstruction": [
+       {
+         "sequence": 1,
+         "text": "3 kali sehari 1 kapsul sesudah makan",
+         "timing": {
+           "repeat": {
+             "frequency": 3,
+             "period": 1,
+             "periodUnit": "d"
+           }
+         },
+         "route": {
+           "coding": [
+             {
+               "system": "http://snomed.info/sct",
+               "code": "26643006",
+               "display": "Oral route"
+             }
+           ]
+         },
+         "doseAndRate": [
+           {
+             "doseQuantity": {
+               "value": 1,
+               "unit": "Kapsul",
+               "system": "http://terminology.hl7.org/CodeSystem/v3-orderableDrugForm",
+               "code": "CAPS"
+             }
+           }
+         ]
+       }
+     ],
+     "dispenseRequest": {
+       "numberOfRepeatsAllowed": 0,
+       "quantity": {
+         "value": 21,
+         "unit": "Kapsul",
+         "code": "CAPS"
+       },
+       "expectedSupplyDuration": {
+         "value": 7,
+         "unit": "days",
+         "system": "http://unitsofmeasure.org",
+         "code": "d"
+       }
+     }
+   }
+
+3. MedicationDispense Resource:
+   {
+     "resourceType": "MedicationDispense",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/MedicationDispense"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/prescription",
+         "value": "RX-20250120-001-DISP"
+       }
+     ],
+     "status": "completed",  // preparation | in-progress | cancelled | on-hold | completed | entered-in-error | stopped | declined | unknown
+     "medicationReference": {
+       "reference": "Medication/MED001",
+       "display": "Amoxicillin 500 mg Kapsul"
+     },
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "context": {
+       "reference": "Encounter/12345"
+     },
+     "performer": [
+       {
+         "actor": {
+           "reference": "Practitioner/N10000002",
+           "display": "Apt. Jane Smith"
+         }
+       }
+     ],
+     "location": {
+       "reference": "Location/pharmacy-001"
+     },
+     "authorizingPrescription": [
+       {
+         "reference": "MedicationRequest/RX-20250120-001"
+       }
+     ],
+     "quantity": {
+       "value": 21,
+       "unit": "Kapsul",
+       "code": "CAPS"
+     },
+     "whenPrepared": "2025-01-20T11:00:00+07:00",
+     "whenHandedOver": "2025-01-20T11:15:00+07:00",
+     "dosageInstruction": [
+       {
+         "sequence": 1,
+         "text": "3 kali sehari 1 kapsul sesudah makan selama 7 hari"
+       }
+     ]
+   }
+
+4. Medication Workflow:
+   - Create Medication master data for drugs in formulary
+   - Generate MedicationRequest when doctor prescribes
+   - Submit to SATUSEHAT with encounter reference
+   - Update status when dispensed
+   - Create MedicationDispense after pharmacy fulfillment
+   - Link all medication resources properly
+   - Track medication history per patient
+
+5. KFA (Kode Farmasi dan Alkes) Integration:
+   - Use official KFA codes for medications
+   - Map local drug codes to KFA
+   - Validate medication codes before submission
+   - Keep KFA master data updated
+
+Include medication reconciliation and interaction checking
+```
+
+### 7.11 Additional Clinical Resources
+```
+Implement extended clinical documentation resources:
+
+1. Composition Resource (Clinical Document):
+   {
+     "resourceType": "Composition",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Composition"]
+     },
+     "identifier": {
+       "system": "http://sys-ids.kemkes.go.id/composition",
+       "value": "COMP-20250120-001"
+     },
+     "status": "final",  // preliminary | final | amended | entered-in-error
+     "type": {
+       "coding": [
+         {
+           "system": "http://loinc.org",
+           "code": "18842-5",
+           "display": "Discharge summary"
+         }
+       ]
+     },
+     "category": [
+       {
+         "coding": [
+           {
+             "system": "http://loinc.org",
+             "code": "LP173421-1",
+             "display": "Report"
+           }
+         ]
+       }
+     ],
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "date": "2025-01-20T15:00:00+07:00",
+     "author": [
+       {
+         "reference": "Practitioner/N10000001"
+       }
+     ],
+     "title": "Ringkasan Pulang Pasien",
+     "section": [
+       {
+         "title": "Keluhan Utama",
+         "code": {
+           "coding": [
+             {
+               "system": "http://loinc.org",
+               "code": "10154-3",
+               "display": "Chief complaint"
+             }
+           ]
+         },
+         "text": {
+           "status": "generated",
+           "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Nyeri ulu hati sejak 3 hari</div>"
+         }
+       },
+       {
+         "title": "Riwayat Penyakit",
+         "code": {
+           "coding": [
+             {
+               "system": "http://loinc.org",
+               "code": "10164-2",
+               "display": "History of Present illness"
+             }
+           ]
+         },
+         "text": {
+           "status": "generated",
+           "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Pasien mengeluh nyeri ulu hati...</div>"
+         }
+       },
+       {
+         "title": "Diagnosis",
+         "code": {
+           "coding": [
+             {
+               "system": "http://loinc.org",
+               "code": "29308-4",
+               "display": "Diagnosis"
+             }
+           ]
+         },
+         "entry": [
+           {
+             "reference": "Condition/67890"
+           }
+         ]
+       },
+       {
+         "title": "Tindakan/Prosedur",
+         "code": {
+           "coding": [
+             {
+               "system": "http://loinc.org",
+               "code": "29554-3",
+               "display": "Procedure"
+             }
+           ]
+         },
+         "entry": [
+           {
+             "reference": "Procedure/78901"
+           }
+         ]
+       },
+       {
+         "title": "Rencana Tindak Lanjut",
+         "code": {
+           "coding": [
+             {
+               "system": "http://loinc.org",
+               "code": "18776-5",
+               "display": "Plan of care"
+             }
+           ]
+         },
+         "text": {
+           "status": "generated",
+           "div": "<div xmlns=\"http://www.w3.org/1999/xhtml\">Kontrol 1 minggu, hindari makanan pedas...</div>"
+         }
+       }
+     ]
+   }
+
+2. AllergyIntolerance Resource:
+   {
+     "resourceType": "AllergyIntolerance",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/AllergyIntolerance"]
+     },
+     "clinicalStatus": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-clinical",
+           "code": "active",
+           "display": "Active"
+         }
+       ]
+     },
+     "verificationStatus": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/allergyintolerance-verification",
+           "code": "confirmed",
+           "display": "Confirmed"
+         }
+       ]
+     },
+     "type": "allergy",  // allergy | intolerance
+     "category": ["medication"],  // food | medication | environment | biologic
+     "criticality": "high",  // low | high | unable-to-assess
+     "code": {
+       "coding": [
+         {
+           "system": "http://snomed.info/sct",
+           "code": "387207008",
+           "display": "Penicillin"
+         }
+       ]
+     },
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "onsetDateTime": "2020-05-10T00:00:00+07:00",
+     "recordedDate": "2025-01-20T09:00:00+07:00",
+     "recorder": {
+       "reference": "Practitioner/N10000001"
+     },
+     "reaction": [
+       {
+         "substance": {
+           "coding": [
+             {
+               "system": "http://snomed.info/sct",
+               "code": "387207008",
+               "display": "Penicillin"
+             }
+           ]
+         },
+         "manifestation": [
+           {
+             "coding": [
+               {
+                 "system": "http://snomed.info/sct",
+                 "code": "271807003",
+                 "display": "Skin rash"
+               }
+             ]
+           }
+         ],
+         "severity": "severe"  // mild | moderate | severe
+       }
+     ]
+   }
+
+3. ClinicalImpression Resource:
+   {
+     "resourceType": "ClinicalImpression",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/ClinicalImpression"]
+     },
+     "status": "completed",
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "effectiveDateTime": "2025-01-20T10:00:00+07:00",
+     "date": "2025-01-20T10:30:00+07:00",
+     "assessor": {
+       "reference": "Practitioner/N10000001"
+     },
+     "problem": [
+       {
+         "reference": "Condition/67890"
+       }
+     ],
+     "investigation": [
+       {
+         "code": {
+           "text": "Physical Examination"
+         },
+         "item": [
+           {
+             "reference": "Observation/vital-signs-001"
+           }
+         ]
+       }
+     ],
+     "summary": "Patient presents with gastritis symptoms. Physical examination shows epigastric tenderness. Endoscopy performed showing mild gastritis.",
+     "finding": [
+       {
+         "itemCodeableConcept": {
+           "coding": [
+             {
+               "system": "http://snomed.info/sct",
+               "code": "43116000",
+               "display": "Epigastric tenderness"
+             }
+           ]
+         }
+       }
+     ],
+     "prognosisCodeableConcept": [
+       {
+         "coding": [
+           {
+             "system": "http://snomed.info/sct",
+             "code": "365858006",
+             "display": "Good prognosis"
+           }
+         ]
+       }
+     ]
+   }
+
+4. Immunization Resource:
+   {
+     "resourceType": "Immunization",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Immunization"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/immunization",
+         "value": "IMM-20250120-001"
+       }
+     ],
+     "status": "completed",  // completed | entered-in-error | not-done
+     "vaccineCode": {
+       "coding": [
+         {
+           "system": "http://sys-ids.kemkes.go.id/kfa",
+           "code": "VCN001",
+           "display": "COVID-19 Vaccine"
+         }
+       ]
+     },
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "occurrenceDateTime": "2025-01-20T11:00:00+07:00",
+     "recorded": "2025-01-20T11:05:00+07:00",
+     "primarySource": true,
+     "location": {
+       "reference": "Location/vaccination-room"
+     },
+     "manufacturer": {
+       "display": "Vaccine Manufacturer Co."
+     },
+     "lotNumber": "LOT12345",
+     "expirationDate": "2026-06-30",
+     "site": {
+       "coding": [
+         {
+           "system": "http://snomed.info/sct",
+           "code": "72098002",
+           "display": "Entire left upper arm"
+         }
+       ]
+     },
+     "route": {
+       "coding": [
+         {
+           "system": "http://snomed.info/sct",
+           "code": "78421000",
+           "display": "Intramuscular route"
+         }
+       ]
+     },
+     "doseQuantity": {
+       "value": 0.5,
+       "unit": "mL",
+       "system": "http://unitsofmeasure.org",
+       "code": "mL"
+     },
+     "performer": [
+       {
+         "function": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/v2-0443",
+               "code": "AP",
+               "display": "Administering Provider"
+             }
+           ]
+         },
+         "actor": {
+           "reference": "Practitioner/N10000002"
+         }
+       }
+     ],
+     "protocolApplied": [
+       {
+         "doseNumberPositiveInt": 2,
+         "seriesDosesPositiveInt": 2
+       }
+     ]
+   }
+
+Include clinical documentation workflow and standardization
+```
+
+### 7.12 Diagnostic & Imaging Resources
+```
+Implement diagnostic requests, specimens, and imaging resources:
+
+1. ServiceRequest Resource:
+   {
+     "resourceType": "ServiceRequest",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/ServiceRequest"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/servicerequest",
+         "value": "SR-20250120-001"
+       }
+     ],
+     "status": "active",  // draft | active | on-hold | revoked | completed | entered-in-error | unknown
+     "intent": "order",
+     "category": [
+       {
+         "coding": [
+           {
+             "system": "http://snomed.info/sct",
+             "code": "108252007",
+             "display": "Laboratory procedure"
+           }
+         ]
+       }
+     ],
+     "priority": "routine",  // routine | urgent | asap | stat
+     "code": {
+       "coding": [
+         {
+           "system": "http://loinc.org",
+           "code": "24331-1",
+           "display": "Lipid panel"
+         }
+       ]
+     },
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "occurrenceDateTime": "2025-01-20T09:00:00+07:00",
+     "authoredOn": "2025-01-20T08:00:00+07:00",
+     "requester": {
+       "reference": "Practitioner/N10000001"
+     },
+     "performer": [
+       {
+         "reference": "Organization/lab-dept"
+       }
+     ],
+     "reasonCode": [
+       {
+         "coding": [
+           {
+             "system": "http://hl7.org/fhir/sid/icd-10",
+             "code": "E78.5",
+             "display": "Hyperlipidemia, unspecified"
+           }
+         ]
+       }
+     ],
+     "specimen": [
+       {
+         "reference": "Specimen/SPEC-001"
+       }
+     ]
+   }
+
+2. Specimen Resource:
+   {
+     "resourceType": "Specimen",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Specimen"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/specimen",
+         "value": "SPEC-20250120-001"
+       }
+     ],
+     "status": "available",  // available | unavailable | unsatisfactory | entered-in-error
+     "type": {
+       "coding": [
+         {
+           "system": "http://snomed.info/sct",
+           "code": "119297000",
+           "display": "Blood specimen"
+         }
+       ]
+     },
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "receivedTime": "2025-01-20T09:15:00+07:00",
+     "request": [
+       {
+         "reference": "ServiceRequest/SR-20250120-001"
+       }
+     ],
+     "collection": {
+       "collector": {
+         "reference": "Practitioner/N10000003"
+       },
+       "collectedDateTime": "2025-01-20T09:00:00+07:00",
+       "quantity": {
+         "value": 5,
+         "unit": "mL"
+       },
+       "method": {
+         "coding": [
+           {
+             "system": "http://snomed.info/sct",
+             "code": "82078001",
+             "display": "Venipuncture"
+           }
+         ]
+       },
+       "bodySite": {
+         "coding": [
+           {
+             "system": "http://snomed.info/sct",
+             "code": "368208006",
+             "display": "Left arm"
+           }
+         ]
+       }
+     },
+     "container": [
+       {
+         "identifier": [
+           {
+             "value": "TUBE-001"
+           }
+         ],
+         "type": {
+           "text": "Yellow top tube (SST)"
+         }
+       }
+     ]
+   }
+
+3. ImagingStudy Resource:
+   {
+     "resourceType": "ImagingStudy",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/ImagingStudy"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/accession",
+         "value": "ACC-20250120-001"
+       }
+     ],
+     "status": "available",
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "started": "2025-01-20T14:00:00+07:00",
+     "numberOfSeries": 1,
+     "numberOfInstances": 10,
+     "procedureCode": [
+       {
+         "coding": [
+           {
+             "system": "http://loinc.org",
+             "code": "30746-2",
+             "display": "CT Chest"
+           }
+         ]
+       }
+     ],
+     "location": {
+       "reference": "Location/radiology-ct"
+     },
+     "reasonCode": [
+       {
+         "coding": [
+           {
+             "system": "http://snomed.info/sct",
+             "code": "267036007",
+             "display": "Dyspnea"
+           }
+         ]
+       }
+     ],
+     "series": [
+       {
+         "uid": "1.2.840.113619.2.55.3.604688119.868.1234567890.1",
+         "number": 1,
+         "modality": {
+           "system": "http://dicom.nema.org/resources/ontology/DCM",
+           "code": "CT"
+         },
+         "description": "Chest CT with Contrast",
+         "numberOfInstances": 10,
+         "bodySite": {
+           "system": "http://snomed.info/sct",
+           "code": "51185008",
+           "display": "Thorax"
+         },
+         "started": "2025-01-20T14:00:00+07:00",
+         "performer": [
+           {
+             "function": {
+               "coding": [
+                 {
+                   "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+                   "code": "PRF",
+                   "display": "Performer"
+                 }
+               ]
+             },
+             "actor": {
+               "reference": "Practitioner/N10000004"
+             }
+           }
+         ],
+         "instance": [
+           {
+             "uid": "1.2.840.113619.2.55.3.604688119.868.1234567890.1.1",
+             "sopClass": {
+               "system": "urn:ietf:rfc:3986",
+               "code": "urn:oid:1.2.840.10008.5.1.4.1.1.2"
+             },
+             "number": 1
+           }
+         ]
+       }
+     ]
+   }
+
+4. ServiceRequest Workflows:
+   a. Laboratory Requests:
+      - Create ServiceRequest for lab tests
+      - Link Specimen collection
+      - Submit to SATUSEHAT
+      - Update status on completion
+      - Link DiagnosticReport when ready
+
+   b. Radiology Requests:
+      - Create ServiceRequest for imaging
+      - Schedule examination
+      - Submit ImagingStudy when performed
+      - Link to DiagnosticReport
+
+   c. Referral Requests:
+      - Internal referrals: Same organization
+      - External referrals: Different organizations
+      - Include referral reason and clinical notes
+      - Track referral status
+
+5. PACS Integration:
+   - Store DICOM images locally
+   - Submit ImagingStudy metadata to SATUSEHAT
+   - Include accession numbers
+   - Link to PACS viewer URLs
+   - Manage study lifecycle
+
+Include integration with laboratory and radiology information systems
+```
+
+### 7.13 Care Management Resources
+```
+Implement care coordination and management resources:
+
+1. EpisodeOfCare Resource:
+   {
+     "resourceType": "EpisodeOfCare",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/EpisodeOfCare"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/episode",
+         "value": "EOC-20250120-001"
+       }
+     ],
+     "status": "active",  // planned | waitlist | active | onhold | finished | cancelled | entered-in-error
+     "type": [
+       {
+         "coding": [
+           {
+             "system": "http://terminology.hl7.org/CodeSystem/episodeofcare-type",
+             "code": "hacc",
+             "display": "Home and Community Care"
+           }
+         ]
+       }
+     ],
+     "diagnosis": [
+       {
+         "condition": {
+           "reference": "Condition/67890"
+         },
+         "role": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/diagnosis-role",
+               "code": "CC",
+               "display": "Chief complaint"
+             }
+           ]
+         },
+         "rank": 1
+       }
+     ],
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "managingOrganization": {
+       "reference": "Organization/org-001"
+     },
+     "period": {
+       "start": "2025-01-20T00:00:00+07:00"
+     },
+     "careManager": {
+       "reference": "Practitioner/N10000001"
+     }
+   }
+
+2. CarePlan Resource:
+   {
+     "resourceType": "CarePlan",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/CarePlan"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/careplan",
+         "value": "CP-20250120-001"
+       }
+     ],
+     "status": "active",  // draft | active | on-hold | revoked | completed | entered-in-error | unknown
+     "intent": "plan",  // proposal | plan | order | option
+     "category": [
+       {
+         "coding": [
+           {
+             "system": "http://snomed.info/sct",
+             "code": "735321000",
+             "display": "Diabetes mellitus care plan"
+           }
+         ]
+       }
+     ],
+     "title": "Diabetes Management Plan",
+     "description": "Comprehensive diabetes management including medication, diet, and exercise",
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "period": {
+       "start": "2025-01-20",
+       "end": "2025-07-20"
+     },
+     "created": "2025-01-20T10:00:00+07:00",
+     "author": {
+       "reference": "Practitioner/N10000001"
+     },
+     "addresses": [
+       {
+         "reference": "Condition/diabetes-001"
+       }
+     ],
+     "goal": [
+       {
+         "reference": "Goal/hba1c-target"
+       }
+     ],
+     "activity": [
+       {
+         "detail": {
+           "kind": "MedicationRequest",
+           "code": {
+             "coding": [
+               {
+                 "system": "http://snomed.info/sct",
+                 "code": "33633005",
+                 "display": "Prescription of drug"
+               }
+             ],
+             "text": "Metformin 500mg twice daily"
+           },
+           "status": "in-progress",
+           "scheduledTiming": {
+             "repeat": {
+               "frequency": 2,
+               "period": 1,
+               "periodUnit": "d"
+             }
+           }
+         }
+       },
+       {
+         "detail": {
+           "kind": "ServiceRequest",
+           "code": {
+             "text": "HbA1c monitoring every 3 months"
+           },
+           "status": "scheduled",
+           "scheduledPeriod": {
+             "start": "2025-04-20",
+             "end": "2025-04-30"
+           }
+         }
+       }
+     ]
+   }
+
+3. QuestionnaireResponse Resource:
+   {
+     "resourceType": "QuestionnaireResponse",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/QuestionnaireResponse"]
+     },
+     "identifier": {
+       "system": "http://sys-ids.kemkes.go.id/questionnaire-response",
+       "value": "QR-20250120-001"
+     },
+     "questionnaire": "http://fhir.kemkes.go.id/Questionnaire/pain-assessment",
+     "status": "completed",
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "encounter": {
+       "reference": "Encounter/12345"
+     },
+     "authored": "2025-01-20T09:00:00+07:00",
+     "author": {
+       "reference": "Practitioner/N10000001"
+     },
+     "item": [
+       {
+         "linkId": "1",
+         "text": "Pain intensity scale (0-10)",
+         "answer": [
+           {
+             "valueInteger": 7
+           }
+         ]
+       },
+       {
+         "linkId": "2",
+         "text": "Pain location",
+         "answer": [
+           {
+             "valueString": "Epigastric region"
+           }
+         ]
+       },
+       {
+         "linkId": "3",
+         "text": "Pain duration",
+         "answer": [
+           {
+             "valueString": "3 days"
+           }
+         ]
+       }
+     ]
+   }
+
+4. RelatedPerson Resource:
+   {
+     "resourceType": "RelatedPerson",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/RelatedPerson"]
+     },
+     "identifier": [
+       {
+         "use": "official",
+         "system": "https://fhir.kemkes.go.id/id/nik",
+         "value": "3174012345678902"
+       }
+     ],
+     "active": true,
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "relationship": [
+       {
+         "coding": [
+           {
+             "system": "http://terminology.hl7.org/CodeSystem/v3-RoleCode",
+             "code": "MTH",
+             "display": "Mother"
+           }
+         ]
+       }
+     ],
+     "name": [
+       {
+         "use": "official",
+         "text": "SITI AMINAH"
+       }
+     ],
+     "telecom": [
+       {
+         "system": "phone",
+         "value": "081987654321",
+         "use": "mobile"
+       }
+     ],
+     "gender": "female",
+     "birthDate": "1970-05-15",
+     "address": [
+       {
+         "use": "home",
+         "text": "Jl. Merdeka No. 123, Jakarta",
+         "city": "Jakarta Selatan",
+         "state": "DKI Jakarta",
+         "postalCode": "12345",
+         "country": "ID"
+       }
+     ]
+   }
+
+5. Care Coordination Workflow:
+   - Create EpisodeOfCare for chronic disease management
+   - Develop comprehensive CarePlan
+   - Track patient-reported outcomes via QuestionnaireResponse
+   - Link family members via RelatedPerson
+   - Coordinate care across multiple encounters
+   - Monitor care plan adherence
+   - Update goals and activities based on progress
+
+Include care coordination dashboard and patient engagement tools
+```
+
+### 7.14 Financial & Coverage Resources
+```
+Implement financial transactions and insurance coverage resources for SATUSEHAT:
+
+1. Coverage Resource (Insurance Information):
+   {
+     "resourceType": "Coverage",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Coverage"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/coverage",
+         "value": "COV-20250120-001"
+       }
+     ],
+     "status": "active",
+     "type": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+           "code": "PUBLICPOL",
+           "display": "Public Healthcare"
+         }
+       ]
+     },
+     "subscriber": {
+       "reference": "Patient/100000030009"
+     },
+     "subscriberId": "0001234567890",  // BPJS Card Number
+     "beneficiary": {
+       "reference": "Patient/100000030009"
+     },
+     "relationship": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/subscriber-relationship",
+           "code": "self",
+           "display": "Self"
+         }
+       ]
+     },
+     "period": {
+       "start": "2025-01-01",
+       "end": "2025-12-31"
+     },
+     "payor": [
+       {
+         "reference": "Organization/bpjs-kesehatan"
+       }
+     ],
+     "class": [
+       {
+         "type": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/coverage-class",
+               "code": "class",
+               "display": "Class"
+             }
+           ]
+         },
+         "value": "3",  // BPJS Class: 1, 2, or 3
+         "name": "Kelas 3"
+       }
+     ]
+   }
+
+2. CoverageEligibilityRequest Resource (SEP Request):
+   {
+     "resourceType": "CoverageEligibilityRequest",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/CoverageEligibilityRequest"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/eligibility-request",
+         "value": "ELREQ-20250120-001"
+       }
+     ],
+     "status": "active",
+     "purpose": ["benefits"],  // auth-requirements | benefits | discovery | validation
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "servicedDate": "2025-01-20",
+     "created": "2025-01-20T08:00:00+07:00",
+     "enterer": {
+       "reference": "Practitioner/N10000001"
+     },
+     "provider": {
+       "reference": "Organization/hospital-001"
+     },
+     "insurer": {
+       "reference": "Organization/bpjs-kesehatan"
+     },
+     "facility": {
+       "reference": "Location/hospital-main"
+     },
+     "insurance": [
+       {
+         "focal": true,
+         "coverage": {
+           "reference": "Coverage/COV-20250120-001"
+         }
+       }
+     ]
+   }
+
+3. CoverageEligibilityResponse Resource (SEP Response):
+   {
+     "resourceType": "CoverageEligibilityResponse",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/CoverageEligibilityResponse"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/sep",
+         "value": "SEP-20250120-001"
+       }
+     ],
+     "status": "active",
+     "purpose": ["benefits"],
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "servicedDate": "2025-01-20",
+     "created": "2025-01-20T08:15:00+07:00",
+     "request": {
+       "reference": "CoverageEligibilityRequest/ELREQ-20250120-001"
+     },
+     "outcome": "complete",  // queued | complete | error | partial
+     "insurer": {
+       "reference": "Organization/bpjs-kesehatan"
+     },
+     "insurance": [
+       {
+         "coverage": {
+           "reference": "Coverage/COV-20250120-001"
+         },
+         "inforce": true,
+         "benefitPeriod": {
+           "start": "2025-01-20",
+           "end": "2025-01-27"
+         },
+         "item": [
+           {
+             "category": {
+               "coding": [
+                 {
+                   "system": "http://terminology.hl7.org/CodeSystem/ex-benefitcategory",
+                   "code": "30",
+                   "display": "Health Benefit Plan Coverage"
+                 }
+               ]
+             },
+             "benefit": [
+               {
+                 "type": {
+                   "coding": [
+                     {
+                       "system": "http://terminology.hl7.org/CodeSystem/benefit-type",
+                       "code": "benefit",
+                       "display": "Benefit"
+                     }
+                   ]
+                 },
+                 "allowedString": "Covered"
+               }
+             ]
+           }
+         ]
+       }
+     ]
+   }
+
+4. Account Resource:
+   {
+     "resourceType": "Account",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Account"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/account",
+         "value": "ACC-20250120-001"
+       }
+     ],
+     "status": "active",
+     "type": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/v3-ActCode",
+           "code": "PBILLACCT",
+           "display": "Patient Billing Account"
+         }
+       ]
+     },
+     "name": "Patient Account - BUDI SANTOSO",
+     "subject": [
+       {
+         "reference": "Patient/100000030009"
+       }
+     ],
+     "servicePeriod": {
+       "start": "2025-01-20",
+       "end": "2025-01-27"
+     },
+     "coverage": [
+       {
+         "coverage": {
+           "reference": "Coverage/COV-20250120-001"
+         },
+         "priority": 1
+       }
+     ],
+     "owner": {
+       "reference": "Organization/hospital-001"
+     },
+     "description": "Inpatient account for gastritis treatment"
+   }
+
+5. ChargeItem Resource:
+   {
+     "resourceType": "ChargeItem",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/ChargeItem"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/charge",
+         "value": "CHG-20250120-001"
+       }
+     ],
+     "status": "billable",
+     "code": {
+       "coding": [
+         {
+           "system": "http://sys-ids.kemkes.go.id/tariff",
+           "code": "TRF-EGD-001",
+           "display": "Esophagogastroduodenoscopy"
+         }
+       ]
+     },
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "context": {
+       "reference": "Encounter/12345"
+     },
+     "occurrenceDateTime": "2025-01-20T10:00:00+07:00",
+     "performer": [
+       {
+         "function": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+               "code": "PRF",
+               "display": "Performer"
+             }
+           ]
+         },
+         "actor": {
+           "reference": "Practitioner/N10000001"
+         }
+       }
+     ],
+     "performingOrganization": {
+       "reference": "Organization/hospital-001"
+     },
+     "quantity": {
+       "value": 1
+     },
+     "priceOverride": {
+       "value": 1500000,
+       "currency": "IDR"
+     },
+     "enteredDate": "2025-01-20T10:30:00+07:00",
+     "account": [
+       {
+         "reference": "Account/ACC-20250120-001"
+       }
+     ]
+   }
+
+6. Invoice Resource:
+   {
+     "resourceType": "Invoice",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Invoice"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/invoice",
+         "value": "INV-20250127-001"
+       }
+     ],
+     "status": "issued",  // draft | issued | balanced | cancelled | entered-in-error
+     "type": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/v2-0301",
+           "code": "IP",
+           "display": "Inpatient"
+         }
+       ]
+     },
+     "subject": {
+       "reference": "Patient/100000030009"
+     },
+     "date": "2025-01-27T16:00:00+07:00",
+     "participant": [
+       {
+         "role": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/v3-ParticipationType",
+               "code": "PRF",
+               "display": "Performer"
+             }
+           ]
+         },
+         "actor": {
+           "reference": "Organization/hospital-001"
+         }
+       }
+     ],
+     "issuer": {
+       "reference": "Organization/hospital-001"
+     },
+     "account": {
+       "reference": "Account/ACC-20250120-001"
+     },
+     "lineItem": [
+       {
+         "sequence": 1,
+         "chargeItemReference": {
+           "reference": "ChargeItem/CHG-20250120-001"
+         },
+         "priceComponent": [
+           {
+             "type": "base",
+             "code": {
+               "text": "EGD Procedure"
+             },
+             "amount": {
+               "value": 1500000,
+               "currency": "IDR"
+             }
+           }
+         ]
+       },
+       {
+         "sequence": 2,
+         "chargeItemReference": {
+           "reference": "ChargeItem/CHG-20250120-002"
+         },
+         "priceComponent": [
+           {
+             "type": "base",
+             "code": {
+               "text": "Room charges - 7 days"
+             },
+             "amount": {
+               "value": 3500000,
+               "currency": "IDR"
+             }
+           }
+         ]
+       }
+     ],
+     "totalGross": {
+       "value": 5000000,
+       "currency": "IDR"
+     },
+     "totalNet": {
+       "value": 5000000,
+       "currency": "IDR"
+     }
+   }
+
+7. Claim Resource:
+   {
+     "resourceType": "Claim",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/Claim"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/claim",
+         "value": "CLM-20250127-001"
+       }
+     ],
+     "status": "active",
+     "type": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/claim-type",
+           "code": "institutional",
+           "display": "Institutional"
+         }
+       ]
+     },
+     "use": "claim",
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "billablePeriod": {
+       "start": "2025-01-20",
+       "end": "2025-01-27"
+     },
+     "created": "2025-01-27T16:30:00+07:00",
+     "enterer": {
+       "reference": "Practitioner/N10000005"
+     },
+     "insurer": {
+       "reference": "Organization/bpjs-kesehatan"
+     },
+     "provider": {
+       "reference": "Organization/hospital-001"
+     },
+     "priority": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/processpriority",
+           "code": "normal"
+         }
+       ]
+     },
+     "supportingInfo": [
+       {
+         "sequence": 1,
+         "category": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/claiminformationcategory",
+               "code": "info",
+               "display": "Information"
+             }
+           ]
+         },
+         "valueReference": {
+           "reference": "CoverageEligibilityResponse/SEP-20250120-001",
+           "display": "SEP Number"
+         }
+       }
+     ],
+     "diagnosis": [
+       {
+         "sequence": 1,
+         "diagnosisReference": {
+           "reference": "Condition/67890"
+         },
+         "type": [
+           {
+             "coding": [
+               {
+                 "system": "http://terminology.hl7.org/CodeSystem/ex-diagnosistype",
+                 "code": "principal",
+                 "display": "Principal Diagnosis"
+               }
+             ]
+           }
+         ]
+       }
+     ],
+     "procedure": [
+       {
+         "sequence": 1,
+         "date": "2025-01-20T10:00:00+07:00",
+         "procedureReference": {
+           "reference": "Procedure/78901"
+         }
+       }
+     ],
+     "insurance": [
+       {
+         "sequence": 1,
+         "focal": true,
+         "coverage": {
+           "reference": "Coverage/COV-20250120-001"
+         }
+       }
+     ],
+     "item": [
+       {
+         "sequence": 1,
+         "productOrService": {
+           "coding": [
+             {
+               "system": "http://hl7.org/fhir/sid/icd-9-cm",
+               "code": "45.13",
+               "display": "Esophagogastroduodenoscopy [EGD]"
+             }
+           ]
+         },
+         "servicedDate": "2025-01-20",
+         "unitPrice": {
+           "value": 1500000,
+           "currency": "IDR"
+         },
+         "net": {
+           "value": 1500000,
+           "currency": "IDR"
+         }
+       },
+       {
+         "sequence": 2,
+         "productOrService": {
+           "coding": [
+             {
+               "system": "http://sys-ids.kemkes.go.id/tariff",
+               "code": "ROOM-CLASS3",
+               "display": "Room Class 3"
+             }
+           ]
+         },
+         "servicedPeriod": {
+           "start": "2025-01-20",
+           "end": "2025-01-27"
+         },
+         "quantity": {
+           "value": 7
+         },
+         "unitPrice": {
+           "value": 500000,
+           "currency": "IDR"
+         },
+         "net": {
+           "value": 3500000,
+           "currency": "IDR"
+         }
+       }
+     ],
+     "total": {
+       "value": 5000000,
+       "currency": "IDR"
+     }
+   }
+
+8. ClaimResponse Resource:
+   {
+     "resourceType": "ClaimResponse",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/ClaimResponse"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/claim-response",
+         "value": "CLMRESP-20250130-001"
+       }
+     ],
+     "status": "active",
+     "type": {
+       "coding": [
+         {
+           "system": "http://terminology.hl7.org/CodeSystem/claim-type",
+           "code": "institutional"
+         }
+       ]
+     },
+     "use": "claim",
+     "patient": {
+       "reference": "Patient/100000030009"
+     },
+     "created": "2025-01-30T10:00:00+07:00",
+     "insurer": {
+       "reference": "Organization/bpjs-kesehatan"
+     },
+     "requestor": {
+       "reference": "Organization/hospital-001"
+     },
+     "request": {
+       "reference": "Claim/CLM-20250127-001"
+     },
+     "outcome": "complete",  // queued | complete | error | partial
+     "disposition": "Claim approved for payment",
+     "item": [
+       {
+         "itemSequence": 1,
+         "adjudication": [
+           {
+             "category": {
+               "coding": [
+                 {
+                   "system": "http://terminology.hl7.org/CodeSystem/adjudication",
+                   "code": "eligible",
+                   "display": "Eligible Amount"
+                 }
+               ]
+             },
+             "amount": {
+               "value": 1500000,
+               "currency": "IDR"
+             }
+           },
+           {
+             "category": {
+               "coding": [
+                 {
+                   "system": "http://terminology.hl7.org/CodeSystem/adjudication",
+                   "code": "benefit",
+                   "display": "Benefit Amount"
+                 }
+               ]
+             },
+             "amount": {
+               "value": 1500000,
+               "currency": "IDR"
+             }
+           }
+         ]
+       },
+       {
+         "itemSequence": 2,
+         "adjudication": [
+           {
+             "category": {
+               "coding": [
+                 {
+                   "system": "http://terminology.hl7.org/CodeSystem/adjudication",
+                   "code": "eligible"
+                 }
+               ]
+             },
+             "amount": {
+               "value": 3500000,
+               "currency": "IDR"
+             }
+           },
+           {
+             "category": {
+               "coding": [
+                 {
+                   "system": "http://terminology.hl7.org/CodeSystem/adjudication",
+                   "code": "benefit"
+                 }
+               ]
+             },
+             "amount": {
+               "value": 3200000,
+               "currency": "IDR"
+             }
+           }
+         ]
+       }
+     ],
+     "total": [
+       {
+         "category": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/adjudication",
+               "code": "submitted",
+               "display": "Submitted Amount"
+             }
+           ]
+         },
+         "amount": {
+           "value": 5000000,
+           "currency": "IDR"
+         }
+       },
+       {
+         "category": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/adjudication",
+               "code": "benefit",
+               "display": "Benefit Amount"
+             }
+           ]
+         },
+         "amount": {
+           "value": 4700000,
+           "currency": "IDR"
+         }
+       }
+     ],
+     "payment": {
+       "type": {
+         "coding": [
+           {
+             "system": "http://terminology.hl7.org/CodeSystem/ex-paymenttype",
+             "code": "complete",
+             "display": "Complete"
+           }
+         ]
+       },
+       "amount": {
+         "value": 4700000,
+         "currency": "IDR"
+       },
+       "date": "2025-02-05"
+     }
+   }
+
+9. PaymentReconciliation Resource:
+   {
+     "resourceType": "PaymentReconciliation",
+     "meta": {
+       "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/PaymentReconciliation"]
+     },
+     "identifier": [
+       {
+         "system": "http://sys-ids.kemkes.go.id/payment-reconciliation",
+         "value": "PAYRECON-20250205-001"
+       }
+     ],
+     "status": "active",
+     "period": {
+       "start": "2025-02-01",
+       "end": "2025-02-05"
+     },
+     "created": "2025-02-05T15:00:00+07:00",
+     "paymentIssuer": {
+       "reference": "Organization/bpjs-kesehatan"
+     },
+     "request": {
+       "reference": "Claim/CLM-20250127-001"
+     },
+     "requestor": {
+       "reference": "Organization/hospital-001"
+     },
+     "outcome": "complete",
+     "disposition": "Payment processed successfully",
+     "paymentDate": "2025-02-05",
+     "paymentAmount": {
+       "value": 4700000,
+       "currency": "IDR"
+     },
+     "paymentIdentifier": {
+       "system": "http://sys-ids.kemkes.go.id/payment",
+       "value": "PAY-20250205-001"
+     },
+     "detail": [
+       {
+         "identifier": {
+           "system": "http://sys-ids.kemkes.go.id/payment-detail",
+           "value": "PAYDET-001"
+         },
+         "type": {
+           "coding": [
+             {
+               "system": "http://terminology.hl7.org/CodeSystem/payment-type",
+               "code": "payment",
+               "display": "Payment"
+             }
+           ]
+         },
+         "request": {
+           "reference": "Claim/CLM-20250127-001"
+         },
+         "response": {
+           "reference": "ClaimResponse/CLMRESP-20250130-001"
+         },
+         "submitter": {
+           "reference": "Organization/hospital-001"
+         },
+         "payee": {
+           "reference": "Organization/hospital-001"
+         },
+         "date": "2025-02-05",
+         "amount": {
+           "value": 4700000,
+           "currency": "IDR"
+         }
+       }
+     ]
+   }
+
+10. PaymentNotice Resource:
+    {
+      "resourceType": "PaymentNotice",
+      "meta": {
+        "profile": ["https://fhir.kemkes.go.id/r4/StructureDefinition/PaymentNotice"]
+      },
+      "identifier": [
+        {
+          "system": "http://sys-ids.kemkes.go.id/payment-notice",
+          "value": "PAYNOT-20250205-001"
+        }
+      ],
+      "status": "active",
+      "request": {
+        "reference": "Claim/CLM-20250127-001"
+      },
+      "response": {
+        "reference": "ClaimResponse/CLMRESP-20250130-001"
+      },
+      "created": "2025-02-05T15:30:00+07:00",
+      "provider": {
+        "reference": "Organization/hospital-001"
+      },
+      "payment": {
+        "reference": "PaymentReconciliation/PAYRECON-20250205-001"
+      },
+      "paymentDate": "2025-02-05",
+      "payee": {
+        "reference": "Organization/hospital-001"
+      },
+      "recipient": {
+        "reference": "Organization/hospital-001"
+      },
+      "amount": {
+        "value": 4700000,
+        "currency": "IDR"
+      },
+      "paymentStatus": {
+        "coding": [
+          {
+            "system": "http://terminology.hl7.org/CodeSystem/paymentstatus",
+            "code": "paid",
+            "display": "Paid"
+          }
+        ]
+      }
+    }
+
+11. Financial Workflow Integration:
+    a. Coverage Verification:
+       - Verify patient insurance status
+       - Create Coverage resource
+       - Validate benefit period
+       - Check coverage class/tier
+
+    b. SEP (Surat Eligibilitas Peserta) Management:
+       - Create CoverageEligibilityRequest
+       - Submit to BPJS via SATUSEHAT
+       - Receive CoverageEligibilityResponse
+       - Store SEP number for claims
+
+    c. Service Charging:
+       - Create Account for patient
+       - Generate ChargeItem for each service
+       - Link to Encounter and Account
+       - Track all billable items
+
+    d. Invoice Generation:
+       - Aggregate all ChargeItems
+       - Create Invoice resource
+       - Calculate total amounts
+       - Apply discounts/adjustments
+
+    e. Claims Processing:
+       - Create Claim with all details
+       - Link diagnoses, procedures, charges
+       - Reference SEP number
+       - Submit to insurer via SATUSEHAT
+
+    f. Claims Response Handling:
+       - Receive ClaimResponse
+       - Review adjudication
+       - Identify approved/rejected items
+       - Calculate patient responsibility
+
+    g. Payment Reconciliation:
+       - Track payment receipt
+       - Create PaymentReconciliation
+       - Match payments to claims
+       - Handle partial payments
+
+    h. Payment Notification:
+       - Generate PaymentNotice
+       - Notify relevant parties
+       - Update financial status
+       - Close billing cycle
+
+12. INA-CBGs Integration:
+    - Calculate grouper code based on diagnoses and procedures
+    - Submit proper coding for tariff calculation
+    - Include severity level and comorbidities
+    - Track special procedures and investigations
+    - Validate against INA-CBGs tariff 2024/2025
+    - Handle special CMG codes for COVID-19, etc.
+
+13. BPJS-Specific Considerations:
+    - Validate SEP before admission
+    - Check PRB (Program Rujuk Balik) status
+    - Handle chronic disease management programs
+    - Submit claims within deadline (10 days)
+    - Track claim verification status
+    - Handle appeals for rejected claims
+
+Include comprehensive financial dashboard and reporting tools
+```
+
 ---
 
-## Phase 7: Billing Module
+## Phase 8: Billing Module
 
-### 7.1 Billing Structure
+### 8.1 Billing Structure
 ```
 Create comprehensive billing system:
 - Service tariff master data
@@ -2568,7 +5283,7 @@ Create comprehensive billing system:
 Support multiple payment types (cash, insurance, company)
 ```
 
-### 7.2 Invoice Generation
+### 8.2 Invoice Generation
 ```
 Implement invoice generation with:
 - Automatic charge compilation from all departments
@@ -2582,7 +5297,7 @@ Implement invoice generation with:
 Include detailed breakdown per category
 ```
 
-### 7.3 Payment Processing
+### 8.3 Payment Processing
 ```
 Build payment processing system:
 - Multiple payment methods (cash, card, transfer, QRIS)
@@ -2595,7 +5310,7 @@ Build payment processing system:
 Include integration points for payment gateways
 ```
 
-### 7.4 Insurance Claim Management
+### 8.4 Insurance Claim Management
 ```
 Create insurance claim management for non-BPJS:
 - Insurance company master data
@@ -2610,9 +5325,9 @@ Generate reports for insurance companies
 
 ---
 
-## Phase 8: Pharmacy Module
+## Phase 9: Pharmacy Module
 
-### 8.1 Drug Master Data
+### 9.1 Drug Master Data
 ```
 Implement drug master data management:
 - Drug catalog with generic and brand names
@@ -2626,7 +5341,7 @@ Implement drug master data management:
 Include barcode support for drugs
 ```
 
-### 8.2 Prescription Processing
+### 9.2 Prescription Processing
 ```
 Create prescription (e-Prescribing) system:
 - Prescription entry by doctors
@@ -2640,7 +5355,7 @@ Create prescription (e-Prescribing) system:
 Include MIMS or ISO drug database integration
 ```
 
-### 8.3 Pharmacy Inventory
+### 9.3 Pharmacy Inventory
 ```
 Build pharmacy inventory management:
 - Stock receiving and inspection
@@ -2654,7 +5369,7 @@ Build pharmacy inventory management:
 Include FIFO/FEFO implementation
 ```
 
-### 8.4 Dispensing Management
+### 9.4 Dispensing Management
 ```
 Implement drug dispensing system:
 - Prescription queue management
@@ -2670,9 +5385,9 @@ Generate drug labels with instructions
 
 ---
 
-## Phase 9: Laboratory Module
+## Phase 10: Laboratory Module
 
-### 9.1 Laboratory Test Master
+### 10.1 Laboratory Test Master
 ```
 Create laboratory test catalog:
 - Test categories (Hematology, Chemistry, Microbiology, etc.)
@@ -2686,7 +5401,7 @@ Create laboratory test catalog:
 Include age and gender-specific normal ranges
 ```
 
-### 9.2 Lab Order Management
+### 10.2 Lab Order Management
 ```
 Implement laboratory order system:
 - Electronic lab orders from clinical modules
@@ -2700,7 +5415,7 @@ Implement laboratory order system:
 Include pre-analytical validations
 ```
 
-### 9.3 Result Entry and Validation
+### 10.3 Result Entry and Validation
 ```
 Build result entry system:
 - Manual result entry interface
@@ -2714,7 +5429,7 @@ Build result entry system:
 Include automatic flag for abnormal values
 ```
 
-### 9.4 Lab Reporting
+### 10.4 Lab Reporting
 ```
 Create laboratory reporting:
 - Result PDF generation with letterhead
@@ -2730,9 +5445,9 @@ Support multiple report formats
 
 ---
 
-## Phase 10: Radiology Module
+## Phase 11: Radiology Module
 
-### 10.1 Radiology Examination Master
+### 11.1 Radiology Examination Master
 ```
 Set up radiology examination catalog:
 - Modalities (X-Ray, CT, MRI, USG)
@@ -2746,7 +5461,7 @@ Set up radiology examination catalog:
 Include CPT codes for procedures
 ```
 
-### 10.2 Radiology Order Workflow
+### 11.2 Radiology Order Workflow
 ```
 Implement radiology ordering system:
 - Electronic ordering from clinical modules
@@ -2760,7 +5475,7 @@ Implement radiology ordering system:
 Include modality worklist preparation
 ```
 
-### 10.3 PACS Integration
+### 11.3 PACS Integration
 ```
 Create PACS/DICOM integration:
 - DICOM worklist provider
@@ -2774,7 +5489,7 @@ Create PACS/DICOM integration:
 Include basic DICOM viewer embedding
 ```
 
-### 10.4 Radiology Reporting
+### 11.4 Radiology Reporting
 ```
 Build radiology reporting system:
 - Structured reporting templates
@@ -2790,9 +5505,9 @@ Generate reports in multiple formats (PDF, DICOM SR)
 
 ---
 
-## Phase 11: Workforce Management Module
+## Phase 12: Workforce Management Module
 
-### 11.1 Employee Master Data
+### 12.1 Employee Master Data
 ```
 Create comprehensive employee management system for Indonesian hospital:
 - Employee data with NIK, NPWP, BPJS Ketenagakerjaan
@@ -2807,7 +5522,7 @@ Create comprehensive employee management system for Indonesian hospital:
 Include validation for Indonesian professional requirements
 ```
 
-### 11.2 Attendance and Scheduling
+### 12.2 Attendance and Scheduling
 ```
 Implement workforce scheduling and attendance:
 - Shift patterns (pagi, siang, malam, libur)
@@ -2822,7 +5537,7 @@ Implement workforce scheduling and attendance:
 Include Indonesian labor law compliance (UU Ketenagakerjaan)
 ```
 
-### 11.3 Payroll Integration
+### 12.3 Payroll Integration
 ```
 Build payroll calculation system:
 - Basic salary and allowances
@@ -2837,7 +5552,7 @@ Build payroll calculation system:
 Generate salary slips and bank transfer files
 ```
 
-### 11.4 Performance Management
+### 12.4 Performance Management
 ```
 Create performance evaluation system:
 - KPI configuration per position
@@ -2852,7 +5567,7 @@ Create performance evaluation system:
 Include Indonesian healthcare worker competency standards
 ```
 
-### 11.5 Medical Staff Credentialing
+### 12.5 Medical Staff Credentialing
 ```
 Implement medical staff credentialing and privileging:
 - Doctor credentials verification
@@ -2869,9 +5584,9 @@ Support Indonesian Medical Council (KKI) requirements
 
 ---
 
-## Phase 12: Surgery/Operating Theater Module
+## Phase 13: Surgery/Operating Theater Module
 
-### 12.1 Operating Room Master Data
+### 13.1 Operating Room Master Data
 ```
 Set up operating theater management system:
 - OR room configuration and equipment
@@ -2886,7 +5601,7 @@ Set up operating theater management system:
 Include integration with sterilization unit (CSSD)
 ```
 
-### 12.2 Surgery Scheduling
+### 13.2 Surgery Scheduling
 ```
 Implement surgery scheduling system:
 - Elective surgery booking
@@ -2902,7 +5617,7 @@ Implement surgery scheduling system:
 Generate surgery schedule boards and notifications
 ```
 
-### 12.3 Pre-Operative Management
+### 13.3 Pre-Operative Management
 ```
 Create pre-operative workflow:
 - Pre-anesthesia evaluation
@@ -2918,7 +5633,7 @@ Create pre-operative workflow:
 Include Indonesian surgical consent forms
 ```
 
-### 12.4 Intra-Operative Documentation
+### 13.4 Intra-Operative Documentation
 ```
 Build intra-operative recording system:
 - Surgery start/end time tracking
@@ -2934,7 +5649,7 @@ Build intra-operative recording system:
 Generate operation reports and integrate with billing
 ```
 
-### 12.5 Post-Operative Management
+### 13.5 Post-Operative Management
 ```
 Implement post-operative care system:
 - Recovery room (RR/PACU) monitoring
@@ -2950,7 +5665,7 @@ Implement post-operative care system:
 Link to quality indicators and surgical audits
 ```
 
-### 12.6 Surgery Analytics
+### 13.6 Surgery Analytics
 ```
 Create surgery analytics and reporting:
 - OR utilization rates
@@ -2968,9 +5683,9 @@ Generate dashboards for OR management
 
 ---
 
-## Phase 13: Newborn/Perinatology Module
+## Phase 14: Newborn/Perinatology Module
 
-### 13.1 Maternal Registration
+### 14.1 Maternal Registration
 ```
 Create maternal and delivery management:
 - Gravida/Para/Abortus tracking (GPA)
@@ -2986,7 +5701,7 @@ Create maternal and delivery management:
 Include integration with antenatal care (ANC) records
 ```
 
-### 13.2 Labor and Delivery
+### 14.2 Labor and Delivery
 ```
 Implement labor and delivery documentation:
 - Admission for delivery workflow
@@ -3002,7 +5717,7 @@ Implement labor and delivery documentation:
 Generate birth certificates and reports
 ```
 
-### 13.3 Newborn Registration
+### 14.3 Newborn Registration
 ```
 Build newborn registration system:
 - Automatic registration from delivery
@@ -3018,7 +5733,7 @@ Build newborn registration system:
 Support Indonesian birth registration requirements
 ```
 
-### 13.4 NICU Management
+### 14.4 NICU Management
 ```
 Create NICU/PICU management system:
 - NICU bed and incubator tracking
@@ -3034,7 +5749,7 @@ Create NICU/PICU management system:
 Include neonatal scoring systems (SNAPPE, CRIB)
 ```
 
-### 13.5 Newborn Clinical Care
+### 14.5 Newborn Clinical Care
 ```
 Implement newborn clinical documentation:
 - Daily progress notes
@@ -3050,7 +5765,7 @@ Implement newborn clinical documentation:
 Generate growth charts and developmental reports
 ```
 
-### 13.6 Breastfeeding Support
+### 14.6 Breastfeeding Support
 ```
 Build breastfeeding management system:
 - Breastfeeding initiation tracking (IMD)
@@ -3066,7 +5781,7 @@ Build breastfeeding management system:
 Support Indonesian exclusive breastfeeding programs
 ```
 
-### 13.7 Discharge and Follow-up
+### 14.7 Discharge and Follow-up
 ```
 Create newborn discharge workflow:
 - Discharge criteria checklist
@@ -3084,9 +5799,9 @@ Include KMS (Kartu Menuju Sehat) initialization
 
 ---
 
-## Phase 14: Integration Hub Module
+## Phase 15: Integration Hub Module
 
-### 14.1 Medical Device Integration
+### 15.1 Medical Device Integration
 ```
 Create medical device integration framework:
 - Vital signs monitors (GE, Philips, Mindray)
@@ -3102,7 +5817,7 @@ Create medical device integration framework:
 Use HL7, ASTM, or proprietary protocols as needed
 ```
 
-### 14.2 WhatsApp Business Integration
+### 15.2 WhatsApp Business Integration
 ```
 Implement WhatsApp notifications for Indonesia:
 - Appointment reminders
@@ -3118,7 +5833,7 @@ Implement WhatsApp notifications for Indonesia:
 Use WhatsApp Business API with proper templates
 ```
 
-### 14.3 Payment Gateway Integration
+### 15.3 Payment Gateway Integration
 ```
 Build payment gateway integrations for Indonesia:
 - Bank transfer (Virtual Account)
@@ -3134,7 +5849,7 @@ Build payment gateway integrations for Indonesia:
 Include payment proof upload and verification
 ```
 
-### 14.4 Third-Party Lab Integration
+### 15.4 Third-Party Lab Integration
 ```
 Create external laboratory integration:
 - Prodia/Cito/Pramita lab connections
@@ -3152,9 +5867,9 @@ Support multiple lab vendors simultaneously
 
 ---
 
-## Phase 15: Security & Authentication
+## Phase 16: Security & Authentication
 
-### 11.1 JWT Authentication
+### 16.1 JWT Authentication
 ```
 Implement JWT-based authentication:
 - User login with username/password
@@ -3168,7 +5883,7 @@ Implement JWT-based authentication:
 Include role and permission claims in JWT
 ```
 
-### 11.2 Role-Based Access Control
+### 16.2 Role-Based Access Control
 ```
 Create comprehensive RBAC system:
 - Roles: Admin, Doctor, Nurse, Pharmacist, Cashier, Lab Tech, Radiographer
@@ -3182,7 +5897,7 @@ Create comprehensive RBAC system:
 Store audit log for all access
 ```
 
-### 11.3 API Security
+### 16.3 API Security
 ```
 Implement API security measures:
 - Rate limiting per endpoint
@@ -3196,7 +5911,7 @@ Implement API security measures:
 Include API key management for external systems
 ```
 
-### 11.4 Audit Trail
+### 16.4 Audit Trail
 ```
 Build comprehensive audit system:
 - User action logging
@@ -3212,9 +5927,9 @@ Include integration with external SIEM if needed
 
 ---
 
-## Phase 16: Reporting & Analytics
+## Phase 17: Reporting & Analytics
 
-### 12.1 Operational Reports
+### 17.1 Operational Reports
 ```
 Create operational reporting system:
 - Daily census reports
@@ -3228,7 +5943,7 @@ Create operational reporting system:
 Export to Excel and PDF formats
 ```
 
-### 12.2 Financial Reports
+### 17.2 Financial Reports
 ```
 Implement financial reporting:
 - Daily revenue reports
@@ -3242,7 +5957,7 @@ Implement financial reporting:
 Include graphical representations
 ```
 
-### 12.3 Regulatory Reports
+### 17.3 Regulatory Reports
 ```
 Build regulatory reporting for Indonesia:
 - RL1-RL5 reports for Ministry of Health
@@ -3256,7 +5971,7 @@ Build regulatory reporting for Indonesia:
 Automate submission where possible
 ```
 
-### 12.4 Business Intelligence
+### 17.4 Business Intelligence
 ```
 Create BI dashboard system:
 - Real-time KPI monitoring
@@ -3272,9 +5987,9 @@ Use PostgreSQL materialized views for performance
 
 ---
 
-## Phase 17: React Frontend Foundation
+## Phase 18: React Frontend Foundation
 
-### 13.1 React Project Setup
+### 18.1 React Project Setup
 ```
 Create a React frontend for HMS using Vite 5.x with:
 - React 18.3.x with TypeScript 5.x
@@ -3288,7 +6003,7 @@ Create a React frontend for HMS using Vite 5.x with:
 Set up proper folder structure: features, components, hooks, utils, services
 ```
 
-### 13.2 Authentication Flow UI
+### 18.2 Authentication Flow UI
 ```
 Implement authentication UI with:
 - Login page with hospital branding
@@ -3302,7 +6017,7 @@ Implement authentication UI with:
 Include loading states and error handling
 ```
 
-### 13.3 Dashboard Layout
+### 18.3 Dashboard Layout
 ```
 Create main dashboard layout with:
 - Responsive sidebar navigation
@@ -3316,7 +6031,7 @@ Create main dashboard layout with:
 Include keyboard shortcuts for common actions
 ```
 
-### 13.4 Patient Management UI
+### 18.4 Patient Management UI
 ```
 Build patient management interface with:
 - Patient registration form with NIK validation
@@ -3332,9 +6047,9 @@ Include form validation and error messages in Indonesian
 
 ---
 
-## Phase 18: React Advanced Features
+## Phase 19: React Advanced Features
 
-### 18.1 Clinical Modules UI
+### 19.1 Clinical Modules UI
 ```
 Create clinical interfaces with:
 - SOAP note entry form
@@ -3348,7 +6063,7 @@ Create clinical interfaces with:
 Include keyboard navigation for faster data entry
 ```
 
-### 18.2 Queue Management Display
+### 19.2 Queue Management Display
 ```
 Implement queue management system:
 - TV display for waiting rooms
@@ -3362,7 +6077,7 @@ Implement queue management system:
 Support multiple display configurations
 ```
 
-### 18.3 PWA Implementation
+### 19.3 PWA Implementation
 ```
 Convert React app to PWA with:
 - Service worker for offline capability
@@ -3376,7 +6091,7 @@ Convert React app to PWA with:
 Test on various devices and networks
 ```
 
-### 18.4 Real-time Features
+### 19.4 Real-time Features
 ```
 Implement real-time updates using WebSocket/SSE:
 - Emergency alerts
@@ -3392,9 +6107,9 @@ Include reconnection logic and error handling
 
 ---
 
-## Phase 19: Testing Strategy
+## Phase 20: Testing Strategy
 
-### 19.1 Backend Unit Tests
+### 20.1 Backend Unit Tests
 ```
 Write comprehensive unit tests for HMS backend:
 - Service layer tests with mocked repositories
@@ -3407,7 +6122,7 @@ Write comprehensive unit tests for HMS backend:
 Include test data factories for Indonesian data
 ```
 
-### 19.2 API Integration Tests
+### 20.2 API Integration Tests
 ```
 Create API integration test suite:
 - Patient registration flow
@@ -3421,7 +6136,7 @@ Create API integration test suite:
 Use Testcontainers for database
 ```
 
-### 19.3 Frontend Testing
+### 20.3 Frontend Testing
 ```
 Implement React testing strategy:
 - Component unit tests with React Testing Library
@@ -3435,7 +6150,7 @@ Implement React testing strategy:
 Include Indonesian locale testing
 ```
 
-### 19.4 End-to-End Tests
+### 20.4 End-to-End Tests
 ```
 Build E2E test suite with Playwright:
 - Complete patient registration with NIK
@@ -3451,9 +6166,9 @@ Run tests on multiple browsers
 
 ---
 
-## Phase 20: Deployment Preparation
+## Phase 21: Deployment Preparation
 
-### 20.1 Docker Configuration
+### 21.1 Docker Configuration
 ```
 Create Docker configuration for HMS:
 - Multi-stage Dockerfile for Spring Boot
@@ -3467,7 +6182,7 @@ Create Docker configuration for HMS:
 Include health checks and restart policies
 ```
 
-### 20.2 CI/CD Pipeline
+### 21.2 CI/CD Pipeline
 ```
 Set up CI/CD pipeline using GitHub Actions/GitLab CI:
 - Automated testing on push
@@ -3481,7 +6196,7 @@ Set up CI/CD pipeline using GitHub Actions/GitLab CI:
 Include notifications for build status
 ```
 
-### 20.3 Database Migration
+### 21.3 Database Migration
 ```
 Prepare production database migration:
 - Flyway migration scripts
@@ -3495,7 +6210,7 @@ Prepare production database migration:
 Test migrations on staging environment
 ```
 
-### 20.4 Monitoring Setup
+### 21.4 Monitoring Setup
 ```
 Implement monitoring and logging:
 - Application metrics with Micrometer
@@ -3511,9 +6226,9 @@ Create runbooks for common issues
 
 ---
 
-## Phase 21: Production Deployment
+## Phase 22: Production Deployment
 
-### 21.1 Server Preparation
+### 22.1 Server Preparation
 ```
 Prepare production servers for HMS:
 - Ubuntu 24.04 LTS setup (or 22.04 LTS acceptable)
@@ -3527,7 +6242,7 @@ Prepare production servers for HMS:
 Document server specifications and network topology
 ```
 
-### 21.2 Production Configuration
+### 22.2 Production Configuration
 ```
 Configure production environment:
 - Production database with replication
@@ -3541,7 +6256,7 @@ Configure production environment:
 Create production configuration checklist
 ```
 
-### 21.3 Security Hardening
+### 22.3 Security Hardening
 ```
 Implement security hardening for production:
 - Remove default accounts
@@ -3556,7 +6271,7 @@ Implement security hardening for production:
 Document security procedures
 ```
 
-### 21.4 Go-Live Preparation
+### 22.4 Go-Live Preparation
 ```
 Prepare for HMS go-live:
 - User training materials in Indonesian
@@ -3572,9 +6287,9 @@ Create go-live runbook with timelines
 
 ---
 
-## Phase 22: Post-Production
+## Phase 23: Post-Production
 
-### 22.1 Performance Optimization
+### 23.1 Performance Optimization
 ```
 Optimize HMS performance in production:
 - Query optimization based on slow query logs
@@ -3588,7 +6303,7 @@ Optimize HMS performance in production:
 Monitor and document improvements
 ```
 
-### 22.2 Backup and Recovery
+### 23.2 Backup and Recovery
 ```
 Implement comprehensive backup strategy:
 - Automated daily database backups
@@ -3602,7 +6317,7 @@ Implement comprehensive backup strategy:
 Create and test disaster recovery procedures
 ```
 
-### 22.3 Maintenance Procedures
+### 23.3 Maintenance Procedures
 ```
 Establish maintenance procedures:
 - Zero-downtime deployment strategy
@@ -3616,7 +6331,7 @@ Establish maintenance procedures:
 Document standard operating procedures (SOP)
 ```
 
-### 22.4 Support and Documentation
+### 23.4 Support and Documentation
 ```
 Create comprehensive documentation:
 - System architecture documentation
@@ -3632,9 +6347,9 @@ Establish support ticket system
 
 ---
 
-## Phase 23: Advanced Features
+## Phase 24: Advanced Features
 
-### 23.1 Mobile Application
+### 24.1 Mobile Application
 ```
 Develop mobile app for HMS:
 - React Native setup with existing React components
@@ -3648,7 +6363,7 @@ Develop mobile app for HMS:
 Deploy to Google Play Store
 ```
 
-### 23.2 Telemedicine Integration
+### 24.2 Telemedicine Integration
 ```
 Add telemedicine capabilities:
 - Video consultation scheduling
@@ -3662,7 +6377,7 @@ Add telemedicine capabilities:
 Include bandwidth optimization
 ```
 
-### 23.3 AI/ML Features
+### 24.3 AI/ML Features
 ```
 Implement AI-powered features:
 - Diagnosis suggestion based on symptoms
@@ -3676,7 +6391,7 @@ Implement AI-powered features:
 Start with simple models and iterate
 ```
 
-### 23.4 Analytics and BI
+### 24.4 Analytics and BI
 ```
 Enhance analytics capabilities:
 - Real-time analytics dashboard
@@ -3692,9 +6407,9 @@ Use Apache Superset or similar for visualization
 
 ---
 
-## Phase 24: Compliance and Quality
+## Phase 25: Compliance and Quality
 
-### 24.1 KARS Accreditation
+### 25.1 KARS Accreditation
 ```
 Prepare HMS for KARS accreditation requirements:
 - Patient safety indicators tracking
@@ -3708,7 +6423,7 @@ Prepare HMS for KARS accreditation requirements:
 Generate required KARS reports automatically
 ```
 
-### 24.2 ISO Certification
+### 25.2 ISO Certification
 ```
 Implement ISO requirements:
 - Document control system
@@ -3722,7 +6437,7 @@ Implement ISO requirements:
 Maintain ISO compliance documentation
 ```
 
-### 24.3 Data Privacy Compliance
+### 25.3 Data Privacy Compliance
 ```
 Ensure data privacy compliance:
 - Personal data inventory
@@ -3736,7 +6451,7 @@ Ensure data privacy compliance:
 Include compliance with Indonesian regulations
 ```
 
-### 24.4 Clinical Governance
+### 25.4 Clinical Governance
 ```
 Implement clinical governance features:
 - Clinical guidelines integration
@@ -3752,9 +6467,9 @@ Support evidence-based medicine practices
 
 ---
 
-## Phase 25: Critical Care & Support Services
+## Phase 26: Critical Care & Support Services
 
-### 25.1 ICU/Critical Care Module
+### 26.1 ICU/Critical Care Module
 ```
 Create comprehensive ICU management system:
 - ICU bed assignment and tracking
@@ -3776,7 +6491,7 @@ Create comprehensive ICU management system:
 Include integration with ventilator devices via HL7
 ```
 
-### 25.2 Hemodialysis Unit Management
+### 26.2 Hemodialysis Unit Management
 ```
 Implement comprehensive hemodialysis module:
 - Patient dialysis schedule (2x/3x weekly patterns)
@@ -3800,7 +6515,7 @@ Implement comprehensive hemodialysis module:
 Include alert system for intradialytic hypotension and other complications
 ```
 
-### 25.3 Blood Bank & Transfusion Service
+### 26.3 Blood Bank & Transfusion Service
 ```
 Build comprehensive blood bank management:
 - Blood inventory by type and component (WB, PRC, FFP, TC, Cryo)
@@ -3828,7 +6543,7 @@ Build comprehensive blood bank management:
 Generate daily blood inventory reports and usage statistics
 ```
 
-### 25.4 CSSD (Central Sterile Supply Department)
+### 26.4 CSSD (Central Sterile Supply Department)
 ```
 Create detailed CSSD management system:
 - Instrument receiving from OR and departments
@@ -3856,9 +6571,9 @@ Include integration with OR scheduling for instrument planning
 
 ---
 
-## Phase 26: Medical Records & Quality Management
+## Phase 27: Medical Records & Quality Management
 
-### 26.1 Medical Records Department (MRMK)
+### 27.1 Medical Records Department (MRMK)
 ```
 Implement Medical Records Department system:
 - Medical record numbering system (family folder vs unit)
@@ -3886,7 +6601,7 @@ Implement Medical Records Department system:
 Include barcode/RFID tracking for physical records
 ```
 
-### 26.2 Infection Prevention & Control (PPIRS)
+### 27.2 Infection Prevention & Control (PPIRS)
 ```
 Create comprehensive infection control system:
 - Healthcare-associated infection (HAI) surveillance
@@ -3924,7 +6639,7 @@ Create comprehensive infection control system:
 Generate monthly infection control reports and dashboards
 ```
 
-### 26.3 Enhanced Incident Reporting System
+### 27.3 Enhanced Incident Reporting System
 ```
 Build detailed patient safety incident reporting:
 - Incident type classification:
@@ -3965,7 +6680,7 @@ Build detailed patient safety incident reporting:
 Include dashboard for hospital leadership with key safety metrics
 ```
 
-### 26.4 Clinical Pathway Management
+### 27.4 Clinical Pathway Management
 ```
 Implement clinical pathway system:
 - Clinical pathway configuration tool
@@ -3991,7 +6706,7 @@ Implement clinical pathway system:
 Generate pathway performance dashboards for quality improvement
 ```
 
-### 26.5 Medication Reconciliation
+### 27.5 Medication Reconciliation
 ```
 Create comprehensive medication reconciliation module:
 - Admission medication history (BPMH - Best Possible Medication History)
@@ -4020,9 +6735,9 @@ Include patient portal access to current medication list
 
 ---
 
-## Phase 27: Indonesian Regulatory Compliance
+## Phase 28: Indonesian Regulatory Compliance
 
-### 27.1 Digital Signature Integration
+### 28.1 Digital Signature Integration
 ```
 Implement comprehensive digital signature solution for Indonesia:
 - Integration with certified providers (Privy, Digisign, VIDA, or PSrE)
@@ -4056,7 +6771,7 @@ Implement comprehensive digital signature solution for Indonesia:
 Generate reports on signing activity and certificate status
 ```
 
-### 27.2 E-Rekam Medis (Electronic Medical Records) Compliance
+### 28.2 E-Rekam Medis (Electronic Medical Records) Compliance
 ```
 Ensure full compliance with Permenkes No. 24/2022 on E-RME:
 - Authentication and authorization matrix
@@ -4097,7 +6812,7 @@ Ensure full compliance with Permenkes No. 24/2022 on E-RME:
 Include documentation of security controls for accreditation
 ```
 
-### 27.3 SIRS (Sistem Informasi Rumah Sakit) Integration
+### 28.3 SIRS (Sistem Informasi Rumah Sakit) Integration
 ```
 Implement Ministry of Health SIRS integration:
 - Hospital profile data submission:
@@ -4151,7 +6866,7 @@ Implement Ministry of Health SIRS integration:
 Generate SIRS compliance reports for hospital management
 ```
 
-### 27.4 DUKCAPIL NIK Verification Integration
+### 28.4 DUKCAPIL NIK Verification Integration
 ```
 Implement real-time NIK verification with DUKCAPIL:
 - API integration with Direktorat Jenderal Kependudukan dan Pencatatan Sipil
@@ -4181,7 +6896,7 @@ Implement real-time NIK verification with DUKCAPIL:
 Include training materials for staff on handling verification issues
 ```
 
-### 27.5 SISRUTE (Sistem Rujukan Terintegrasi) Implementation
+### 28.5 SISRUTE (Sistem Rujukan Terintegrasi) Implementation
 ```
 Build comprehensive referral system integration:
 - Referral letter creation module:
@@ -4221,7 +6936,7 @@ Build comprehensive referral system integration:
 Generate referral statistics and network analysis reports
 ```
 
-### 27.6 Aplicares Integration & Reporting
+### 28.6 Aplicares Integration & Reporting
 ```
 Implement BPJS Aplicares quality monitoring system:
 - Clinical indicator data collection:
@@ -4261,7 +6976,7 @@ Implement BPJS Aplicares quality monitoring system:
 Generate Aplicares performance reports for management review
 ```
 
-### 27.7 P-Care Integration (Primary Care BPJS)
+### 28.7 P-Care Integration (Primary Care BPJS)
 ```
 Implement P-Care integration for primary care referrals:
 - P-Care API authentication
@@ -4296,9 +7011,9 @@ Generate P-Care utilization and outcome reports
 
 ---
 
-## Phase 28: Financial & Procurement System
+## Phase 29: Financial & Procurement System
 
-### 28.1 General Ledger & Chart of Accounts
+### 29.1 General Ledger & Chart of Accounts
 ```
 Implement comprehensive financial accounting system:
 - Chart of accounts configuration (Indonesian standard)
@@ -4331,7 +7046,7 @@ Implement comprehensive financial accounting system:
 Include compliance with Indonesian accounting standards (PSAK)
 ```
 
-### 28.2 Accounts Receivable Management
+### 29.2 Accounts Receivable Management
 ```
 Create comprehensive AR system:
 - Customer master data (patients, insurance companies, corporations)
@@ -4366,7 +7081,7 @@ Create comprehensive AR system:
 Generate comprehensive receivables dashboards and KPIs
 ```
 
-### 28.3 Accounts Payable Management
+### 29.3 Accounts Payable Management
 ```
 Build comprehensive AP system:
 - Vendor master data management
@@ -4398,7 +7113,7 @@ Build comprehensive AP system:
 Generate AP reports (aging, cash flow forecast, vendor analysis)
 ```
 
-### 28.4 Fixed Asset Management
+### 29.4 Fixed Asset Management
 ```
 Implement fixed asset accounting system:
 - Asset master data:
@@ -4443,7 +7158,7 @@ Implement fixed asset accounting system:
 Generate fixed asset reports for tax and financial reporting
 ```
 
-### 28.5 Procurement & Purchase Order Module
+### 29.5 Procurement & Purchase Order Module
 ```
 Create comprehensive procurement system:
 - Purchase requisition (PR) workflow:
@@ -4486,7 +7201,7 @@ Create comprehensive procurement system:
 Include procurement analytics and vendor scorecards
 ```
 
-### 28.6 Indonesian Tax System Integration
+### 29.6 Indonesian Tax System Integration
 ```
 Implement comprehensive tax compliance system:
 - e-Faktur integration for PPN (VAT):
@@ -4537,9 +7252,9 @@ Generate tax reports and compliance checklists
 
 ---
 
-## Phase 29: Patient Engagement & Digital Access
+## Phase 30: Patient Engagement & Digital Access
 
-### 29.1 Patient Portal Development
+### 30.1 Patient Portal Development
 ```
 Build comprehensive patient-facing portal:
 - Patient registration and login:
@@ -4617,7 +7332,7 @@ Build comprehensive patient-facing portal:
 Include patient portal analytics for hospital to monitor adoption
 ```
 
-### 29.2 Advanced Appointment System
+### 30.2 Advanced Appointment System
 ```
 Enhance appointment system with comprehensive features:
 - Multi-channel booking:
@@ -4708,7 +7423,7 @@ Enhance appointment system with comprehensive features:
 Include comprehensive reporting for capacity planning
 ```
 
-### 29.3 Mobile JKN Integration
+### 30.3 Mobile JKN Integration
 ```
 Integrate with BPJS Mobile JKN patient application:
 - QR code generation for patient check-in:
@@ -4750,7 +7465,7 @@ Integrate with BPJS Mobile JKN patient application:
 Generate Mobile JKN integration reports and metrics
 ```
 
-### 29.4 Patient Feedback & Satisfaction System
+### 30.4 Patient Feedback & Satisfaction System
 ```
 Implement comprehensive feedback collection system:
 - Survey design and configuration:
@@ -4816,7 +7531,7 @@ Implement comprehensive feedback collection system:
 Generate monthly patient satisfaction reports for leadership
 ```
 
-### 29.5 Health Education & Engagement Platform
+### 30.5 Health Education & Engagement Platform
 ```
 Create patient education and engagement system:
 - Content management system:
@@ -4897,9 +7612,9 @@ Include content approval workflow and version control
 
 ---
 
-## Phase 30: Specialized Clinical Services
+## Phase 31: Specialized Clinical Services
 
-### 30.1 Medical Check-Up (MCU) Package Management
+### 31.1 Medical Check-Up (MCU) Package Management
 ```
 Build comprehensive MCU package system:
 - MCU package configuration:
@@ -4955,7 +7670,7 @@ Build comprehensive MCU package system:
 Generate MCU business performance dashboards
 ```
 
-### 30.2 Dental Clinic Module
+### 31.2 Dental Clinic Module
 ```
 Implement comprehensive dental management system:
 - Dental charting (odontogram):
@@ -5029,7 +7744,7 @@ Implement comprehensive dental management system:
 Generate dental practice analytics and treatment statistics
 ```
 
-### 30.3 Home Care Service Module
+### 31.3 Home Care Service Module
 ```
 Create comprehensive home care management:
 - Patient enrollment for home care:
@@ -5112,7 +7827,7 @@ Create comprehensive home care management:
 Generate home care utilization and outcome reports
 ```
 
-### 30.4 Oncology Management Module
+### 31.4 Oncology Management Module
 ```
 Build comprehensive oncology care system:
 - Cancer patient registration:
@@ -5194,7 +7909,7 @@ Build comprehensive oncology care system:
 Generate oncology quality metrics and outcome reports
 ```
 
-### 30.5 Cardiology/Cardiac Cath Lab Module
+### 31.5 Cardiology/Cardiac Cath Lab Module
 ```
 Implement cardiology and cath lab management:
 - Cardiac diagnostic testing:
@@ -5275,7 +7990,7 @@ Implement cardiology and cath lab management:
 Generate cardiology and cath lab performance reports
 ```
 
-### 30.6 Rehabilitation/Physiotherapy Module
+### 31.6 Rehabilitation/Physiotherapy Module
 ```
 Create comprehensive rehabilitation management:
 - Rehabilitation assessment:
@@ -5368,9 +8083,9 @@ Generate rehabilitation outcome and productivity reports
 
 ---
 
-## Phase 31: Hospital Operations Management
+## Phase 32: Hospital Operations Management
 
-### 31.1 Asset Management System
+### 32.1 Asset Management System
 ```
 Implement comprehensive hospital asset management:
 - Medical equipment inventory:
@@ -5471,7 +8186,7 @@ Implement comprehensive hospital asset management:
 Generate asset management dashboards for hospital leadership
 ```
 
-### 31.2 Laundry & Linen Management
+### 32.2 Laundry & Linen Management
 ```
 Build laundry service management system:
 - Linen inventory management:
@@ -5548,7 +8263,7 @@ Build laundry service management system:
 Generate laundry utilization and cost efficiency reports
 ```
 
-### 31.3 Housekeeping Management
+### 32.3 Housekeeping Management
 ```
 Implement housekeeping and environmental services:
 - Room status management:
@@ -5638,7 +8353,7 @@ Implement housekeeping and environmental services:
 Generate housekeeping productivity and quality reports
 ```
 
-### 31.4 Food Service/Dietary Management
+### 32.4 Food Service/Dietary Management
 ```
 Create hospital food service management system:
 - Menu planning:
@@ -5734,7 +8449,7 @@ Create hospital food service management system:
 Generate food service quality and cost reports
 ```
 
-### 31.5 Mortuary/Jenazah Management
+### 32.5 Mortuary/Jenazah Management
 ```
 Implement mortuary and deceased patient management:
 - Death notification workflow:
@@ -5832,7 +8547,7 @@ Implement mortuary and deceased patient management:
 Generate mortality reports for hospital administration and government
 ```
 
-### 31.6 Visitor Management System
+### 32.6 Visitor Management System
 ```
 Build comprehensive visitor access control:
 - Visitor registration:
@@ -5908,9 +8623,9 @@ Generate visitor analytics and security reports
 
 ---
 
-## Phase 32: Support Services & Infrastructure
+## Phase 33: Support Services & Infrastructure
 
-### 32.1 Nutrition/Dietetics Service Module
+### 33.1 Nutrition/Dietetics Service Module
 ```
 Implement comprehensive clinical nutrition service:
 - Nutritional screening:
@@ -5999,7 +8714,7 @@ Implement comprehensive clinical nutrition service:
 Generate nutrition service utilization and outcome reports
 ```
 
-### 32.2 Document Management System (DMS)
+### 33.2 Document Management System (DMS)
 ```
 Build comprehensive document control system:
 - Document repository:
@@ -6084,7 +8799,7 @@ Build comprehensive document control system:
 Generate document metrics (total documents, pending approvals, overdue reviews)
 ```
 
-### 32.3 Internal Communication Platform
+### 33.3 Internal Communication Platform
 ```
 Create hospital-wide communication system:
 - Instant messaging:
@@ -6166,7 +8881,7 @@ Create hospital-wide communication system:
 Generate communication analytics (response times, message volume)
 ```
 
-### 32.4 Multi-Facility Management
+### 33.4 Multi-Facility Management
 ```
 Implement enterprise features for hospital groups:
 - Facility master data:
