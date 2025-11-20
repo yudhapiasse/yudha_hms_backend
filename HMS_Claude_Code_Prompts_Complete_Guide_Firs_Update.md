@@ -2261,7 +2261,7 @@ Build comprehensive Encounter management for SATUSEHAT:
 Include comprehensive encounter tracking and reconciliation
 ```
 
-### 
+### 7.4 Clinical Resources Submission
 ```
 Implement complete clinical data submission to SATUSEHAT:
 
