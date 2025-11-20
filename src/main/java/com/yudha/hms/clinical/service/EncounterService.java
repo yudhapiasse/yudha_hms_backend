@@ -44,6 +44,7 @@ public class EncounterService {
     private final EncounterParticipantRepository participantRepository;
     private final EncounterDiagnosisRepository diagnosisRepository;
     private final EncounterStatusHistoryRepository statusHistoryRepository;
+    private final QueueIntegrationService queueIntegrationService;
 
     /**
      * Create a new encounter.
@@ -184,6 +185,9 @@ public class EncounterService {
 
         // Save encounter (status history is cascade persisted)
         encounter = encounterRepository.save(encounter);
+
+        // Sync queue status with encounter status change
+        queueIntegrationService.syncQueueStatus(encounter);
 
         log.info("Encounter status updated from {} to {}", oldStatus, newStatus);
 
