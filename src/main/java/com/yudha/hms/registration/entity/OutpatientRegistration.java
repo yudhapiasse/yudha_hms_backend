@@ -136,6 +136,33 @@ public class OutpatientRegistration extends AuditableEntity {
     @Column(name = "queue_code", length = 10)
     private String queueCode; // e.g., "A001", "B015"
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "queue_status", length = 20)
+    @Builder.Default
+    private QueueStatus queueStatus = QueueStatus.WAITING;
+
+    @Column(name = "queue_called_at")
+    private LocalDateTime queueCalledAt;
+
+    @Column(name = "queue_called_by", length = 100)
+    private String queueCalledBy;
+
+    @Column(name = "queue_serving_started_at")
+    private LocalDateTime queueServingStartedAt;
+
+    @Column(name = "queue_serving_ended_at")
+    private LocalDateTime queueServingEndedAt;
+
+    @Column(name = "queue_skipped_at")
+    private LocalDateTime queueSkippedAt;
+
+    @Column(name = "queue_skip_reason", columnDefinition = "TEXT")
+    private String queueSkipReason;
+
+    // ========== Encounter Link ==========
+    @Column(name = "encounter_id")
+    private UUID encounterId;
+
     // ========== Visit Reason ==========
     @Column(name = "chief_complaint", columnDefinition = "TEXT")
     private String chiefComplaint;
@@ -270,5 +297,101 @@ public class OutpatientRegistration extends AuditableEntity {
      */
     public String getStatusDisplay() {
         return status.getDisplayName();
+    }
+
+    // ========== Queue Management Methods ==========
+
+    /**
+     * Call patient from queue.
+     */
+    public void callQueue(String calledBy) {
+        if (queueStatus != null && !queueStatus.canBeCalled()) {
+            throw new IllegalStateException("Cannot call patient in current queue status: " + queueStatus);
+        }
+        this.queueStatus = QueueStatus.CALLED;
+        this.queueCalledAt = LocalDateTime.now();
+        this.queueCalledBy = calledBy;
+    }
+
+    /**
+     * Start serving patient.
+     */
+    public void startServing() {
+        if (queueStatus != null && !queueStatus.canStartServing()) {
+            throw new IllegalStateException("Cannot start serving patient in current queue status: " + queueStatus);
+        }
+        this.queueStatus = QueueStatus.SERVING;
+        this.queueServingStartedAt = LocalDateTime.now();
+        startConsultation();
+    }
+
+    /**
+     * Complete queue service.
+     */
+    public void completeQueue() {
+        this.queueStatus = QueueStatus.COMPLETED;
+        this.queueServingEndedAt = LocalDateTime.now();
+        completeConsultation();
+    }
+
+    /**
+     * Skip patient (not present when called).
+     */
+    public void skipQueue(String reason) {
+        this.queueStatus = QueueStatus.SKIPPED;
+        this.queueSkippedAt = LocalDateTime.now();
+        this.queueSkipReason = reason;
+    }
+
+    /**
+     * Cancel queue.
+     */
+    public void cancelQueue(String reason, String cancelledByUser) {
+        this.queueStatus = QueueStatus.CANCELLED;
+        cancel(reason, cancelledByUser);
+    }
+
+    /**
+     * Get queue wait time in minutes.
+     */
+    public Integer getQueueWaitTimeMinutes() {
+        if (checkInTime != null && queueServingStartedAt != null) {
+            Duration duration = Duration.between(checkInTime, queueServingStartedAt);
+            return (int) duration.toMinutes();
+        }
+        if (checkInTime != null && queueServingStartedAt == null) {
+            Duration duration = Duration.between(checkInTime, LocalDateTime.now());
+            return (int) duration.toMinutes();
+        }
+        return null;
+    }
+
+    /**
+     * Get queue service time in minutes.
+     */
+    public Integer getQueueServiceTimeMinutes() {
+        if (queueServingStartedAt != null && queueServingEndedAt != null) {
+            Duration duration = Duration.between(queueServingStartedAt, queueServingEndedAt);
+            return (int) duration.toMinutes();
+        }
+        if (queueServingStartedAt != null && queueServingEndedAt == null) {
+            Duration duration = Duration.between(queueServingStartedAt, LocalDateTime.now());
+            return (int) duration.toMinutes();
+        }
+        return null;
+    }
+
+    /**
+     * Check if queue is active.
+     */
+    public boolean isQueueActive() {
+        return queueStatus != null && queueStatus.isActive();
+    }
+
+    /**
+     * Check if queue is completed.
+     */
+    public boolean isQueueCompleted() {
+        return queueStatus != null && queueStatus.isCompleted();
     }
 }

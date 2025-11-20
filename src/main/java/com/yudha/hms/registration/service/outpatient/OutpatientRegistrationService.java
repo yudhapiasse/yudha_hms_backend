@@ -1,5 +1,9 @@
 package com.yudha.hms.registration.service.outpatient;
 
+import com.yudha.hms.clinical.dto.EncounterRequest;
+import com.yudha.hms.clinical.dto.EncounterResponse;
+import com.yudha.hms.clinical.entity.*;
+import com.yudha.hms.clinical.service.EncounterService;
 import com.yudha.hms.patient.entity.Patient;
 import com.yudha.hms.patient.repository.PatientRepository;
 import com.yudha.hms.registration.dto.outpatient.OutpatientRegistrationRequest;
@@ -43,6 +47,7 @@ public class OutpatientRegistrationService {
     private final DoctorScheduleRepository scheduleRepository;
     private final QueueService queueService;
     private final DoctorScheduleService doctorScheduleService;
+    private final EncounterService encounterService;
 
     /**
      * Register walk-in patient.
@@ -109,6 +114,13 @@ public class OutpatientRegistrationService {
         OutpatientRegistration saved = registrationRepository.save(registration);
 
         log.info("Walk-in registration created: {} with queue {}", registrationNumber, queueCode);
+
+        // Auto-create encounter
+        EncounterResponse encounter = createEncounterForRegistration(saved, patient, polyclinic, doctor);
+        saved.setEncounterId(encounter.getId());
+        saved = registrationRepository.save(saved);
+
+        log.info("Encounter auto-created: {} for registration: {}", encounter.getEncounterNumber(), registrationNumber);
 
         return convertToResponse(saved, patient);
     }
@@ -237,10 +249,29 @@ public class OutpatientRegistrationService {
 
         // Check in
         registration.checkIn();
-
-        registrationRepository.save(registration);
+        registration = registrationRepository.save(registration);
 
         log.info("Patient checked in with queue: {}", registration.getQueueCode());
+
+        // Auto-create encounter if not already created
+        if (registration.getEncounterId() == null) {
+            UUID patientId = registration.getPatientId();
+            Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "ID", patientId));
+
+            EncounterResponse encounter = createEncounterForRegistration(
+                registration,
+                patient,
+                registration.getPolyclinic(),
+                registration.getDoctor()
+            );
+
+            registration.setEncounterId(encounter.getId());
+            registration = registrationRepository.save(registration);
+
+            log.info("Encounter auto-created on check-in: {} for registration: {}",
+                encounter.getEncounterNumber(), registration.getRegistrationNumber());
+        }
 
         Patient patient = patientRepository.findById(registration.getPatientId()).orElse(null);
         return convertToResponse(registration, patient);
@@ -440,6 +471,37 @@ public class OutpatientRegistrationService {
 
     private BigDecimal calculateConsultationFee(Doctor doctor, Boolean isBpjs) {
         return doctor.getConsultationFee(Boolean.TRUE.equals(isBpjs));
+    }
+
+    /**
+     * Create encounter for outpatient registration.
+     */
+    private EncounterResponse createEncounterForRegistration(
+        OutpatientRegistration registration,
+        Patient patient,
+        Polyclinic polyclinic,
+        Doctor doctor
+    ) {
+        EncounterRequest encounterRequest = EncounterRequest.builder()
+            .patientId(patient.getId())
+            .encounterType(EncounterType.OUTPATIENT)
+            .encounterClass(EncounterClass.AMBULATORY)
+            .outpatientRegistrationId(registration.getId())
+            .encounterStart(registration.getRegistrationTime())
+            .currentDepartment(polyclinic.getName())
+            .practitionerId(doctor.getId())
+            .attendingDoctorId(doctor.getId())
+            .attendingDoctorName(doctor.getFullName())
+            .priority(Priority.ROUTINE)
+            .reasonForVisit(registration.getChiefComplaint())
+            .chiefComplaint(registration.getChiefComplaint())
+            .insuranceType(Boolean.TRUE.equals(registration.getIsBpjs()) ?
+                InsuranceType.BPJS : InsuranceType.SELF_PAY)
+            .insuranceNumber(registration.getBpjsCardNumber())
+            .sepNumber(registration.getBpjsCardNumber())
+            .build();
+
+        return encounterService.createEncounter(encounterRequest);
     }
 
     private OutpatientRegistrationResponse convertToResponse(

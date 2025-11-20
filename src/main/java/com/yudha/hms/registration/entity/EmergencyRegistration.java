@@ -276,6 +276,23 @@ public class EmergencyRegistration extends AuditableEntity {
     @Column(name = "conversion_time")
     private LocalDateTime conversionTime;
 
+    // ========== Encounter Integration ==========
+    @Column(name = "encounter_id")
+    private UUID encounterId;
+
+    // ========== Enhanced Timing Metrics ==========
+    @Column(name = "arrival_acknowledged_at")
+    private LocalDateTime arrivalAcknowledgedAt;
+
+    @Column(name = "arrival_acknowledged_by", length = 200)
+    private String arrivalAcknowledgedBy;
+
+    @Column(name = "treatment_start_time")
+    private LocalDateTime treatmentStartTime;
+
+    @Column(name = "treatment_started_by", length = 200)
+    private String treatmentStartedBy;
+
     // ========== Timing Metrics ==========
     @Column(name = "door_to_triage_minutes")
     private Integer doorToTriageMinutes;
@@ -376,6 +393,38 @@ public class EmergencyRegistration extends AuditableEntity {
     private List<TriageAssessment> triageAssessments = new ArrayList<>();
 
     // ========== Business Methods ==========
+
+    /**
+     * Acknowledge patient arrival.
+     * Transitions status from REGISTERED to ARRIVED.
+     */
+    public void acknowledgeArrival(String acknowledgedBy) {
+        if (this.status != EmergencyStatus.REGISTERED) {
+            throw new IllegalStateException("Cannot acknowledge arrival when status is: " + this.status);
+        }
+        this.arrivalAcknowledgedAt = LocalDateTime.now();
+        this.arrivalAcknowledgedBy = acknowledgedBy;
+        this.status = EmergencyStatus.ARRIVED;
+    }
+
+    /**
+     * Start emergency treatment.
+     * Transitions status to IN_TREATMENT.
+     */
+    public void startTreatment(String startedBy) {
+        if (this.status != EmergencyStatus.TRIAGED && this.status != EmergencyStatus.ARRIVED) {
+            throw new IllegalStateException("Cannot start treatment when status is: " + this.status);
+        }
+        this.treatmentStartTime = LocalDateTime.now();
+        this.treatmentStartedBy = startedBy;
+        this.status = EmergencyStatus.IN_TREATMENT;
+
+        // Calculate door-to-doctor time
+        if (arrivalTime != null) {
+            Duration duration = Duration.between(arrivalTime, treatmentStartTime);
+            this.doorToDoctorMinutes = (int) duration.toMinutes();
+        }
+    }
 
     /**
      * Mark patient as triaged with level and priority.

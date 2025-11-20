@@ -1,5 +1,9 @@
 package com.yudha.hms.registration.service;
 
+import com.yudha.hms.clinical.dto.EncounterRequest;
+import com.yudha.hms.clinical.dto.EncounterResponse;
+import com.yudha.hms.clinical.entity.*;
+import com.yudha.hms.clinical.service.EncounterService;
 import com.yudha.hms.patient.entity.Patient;
 import com.yudha.hms.patient.repository.PatientRepository;
 import com.yudha.hms.registration.dto.AdmissionRequest;
@@ -38,6 +42,7 @@ public class EmergencyRegistrationService {
     private final EmergencyRegistrationRepository emergencyRepository;
     private final PatientRepository patientRepository;
     private final InpatientAdmissionService inpatientAdmissionService;
+    private final EncounterService encounterService;
 
     /**
      * Register emergency patient with fast-track support.
@@ -90,6 +95,22 @@ public class EmergencyRegistrationService {
 
         // Save emergency registration
         EmergencyRegistration saved = emergencyRepository.save(emergency);
+
+        // Auto-create encounter for emergency patient
+        if (saved.isPatientIdentified()) {
+            // Only create encounter for identified patients
+            UUID patientId = saved.getPatientId();
+            Patient patient = patientRepository.findById(patientId)
+                .orElseThrow(() -> new ResourceNotFoundException("Patient", "ID", patientId));
+
+            EncounterResponse encounter = createEncounterForEmergency(saved, patient);
+            saved.setEncounterId(encounter.getId());
+            saved = emergencyRepository.save(saved);
+
+            log.info("Encounter created for emergency registration: {}", encounter.getId());
+        } else {
+            log.info("Encounter creation skipped for unknown patient. Will be created upon identification.");
+        }
 
         log.info("Emergency registration created: {} for {}",
             emergencyNumber,
@@ -264,12 +285,20 @@ public class EmergencyRegistrationService {
 
         emergency.setPatientId(patientId);
         emergency.setIsUnknownPatient(false);
-        emergencyRepository.save(emergency);
+        EmergencyRegistration saved = emergencyRepository.save(emergency);
 
-        log.info("Unknown patient {} linked to patient ID: {}",
-            emergency.getUnknownPatientIdentifier(), patientId);
+        // Create encounter now that patient is identified
+        Patient patient = patientRepository.findById(patientId)
+            .orElseThrow(() -> new ResourceNotFoundException("Patient", "ID", patientId));
 
-        return convertToResponse(emergency);
+        EncounterResponse encounter = createEncounterForEmergency(saved, patient);
+        saved.setEncounterId(encounter.getId());
+        saved = emergencyRepository.save(saved);
+
+        log.info("Unknown patient {} linked to patient ID: {} and encounter created: {}",
+            saved.getUnknownPatientIdentifier(), patientId, encounter.getId());
+
+        return convertToResponse(saved);
     }
 
     /**
@@ -691,5 +720,85 @@ public class EmergencyRegistrationService {
             return minutes + " minutes in ER";
         }
         return null;
+    }
+
+    /**
+     * Create encounter for emergency registration.
+     * Maps emergency registration to encounter for seamless clinical workflow integration.
+     */
+    private EncounterResponse createEncounterForEmergency(EmergencyRegistration emergency, Patient patient) {
+        log.info("Creating encounter for emergency registration: {}", emergency.getEmergencyNumber());
+
+        // Map triage level to encounter priority
+        Priority encounterPriority = mapTriageLevelToEncounterPriority(emergency.getTriageLevel());
+
+        EncounterRequest encounterRequest = EncounterRequest.builder()
+            .patientId(patient.getId())
+            .encounterType(EncounterType.EMERGENCY)
+            .encounterClass(EncounterClass.EMERGENCY)
+            .emergencyRegistrationId(emergency.getId())
+            .encounterStart(emergency.getArrivalTime())
+            .currentDepartment("Emergency Department")
+            .priority(encounterPriority)
+            .reasonForVisit(emergency.getChiefComplaint())
+            .chiefComplaint(emergency.getChiefComplaint())
+            .insuranceType(mapPaymentMethodToInsuranceType(emergency.getPaymentMethod()))
+            .insuranceNumber(emergency.getInsuranceNumber())
+            .build();
+
+        // Set attending doctor if assigned
+        if (emergency.getAttendingDoctorId() != null) {
+            encounterRequest = EncounterRequest.builder()
+                .patientId(encounterRequest.getPatientId())
+                .encounterType(encounterRequest.getEncounterType())
+                .encounterClass(encounterRequest.getEncounterClass())
+                .emergencyRegistrationId(encounterRequest.getEmergencyRegistrationId())
+                .encounterStart(encounterRequest.getEncounterStart())
+                .currentDepartment(encounterRequest.getCurrentDepartment())
+                .practitionerId(emergency.getAttendingDoctorId())
+                .attendingDoctorId(emergency.getAttendingDoctorId())
+                .attendingDoctorName(emergency.getAttendingDoctorName())
+                .priority(encounterRequest.getPriority())
+                .reasonForVisit(encounterRequest.getReasonForVisit())
+                .chiefComplaint(encounterRequest.getChiefComplaint())
+                .insuranceType(encounterRequest.getInsuranceType())
+                .insuranceNumber(encounterRequest.getInsuranceNumber())
+                .build();
+        }
+
+        return encounterService.createEncounter(encounterRequest);
+    }
+
+    /**
+     * Map triage level to encounter priority enum.
+     */
+    private Priority mapTriageLevelToEncounterPriority(TriageLevel triageLevel) {
+        if (triageLevel == null) {
+            return Priority.ROUTINE;
+        }
+
+        return switch (triageLevel) {
+            case RED -> Priority.EMERGENCY;
+            case YELLOW -> Priority.URGENT;
+            case GREEN, WHITE -> Priority.ROUTINE; // Non-urgent cases
+            case BLACK -> Priority.EMERGENCY; // Deceased - still emergency priority for documentation
+        };
+    }
+
+    /**
+     * Map payment method to insurance type.
+     */
+    private InsuranceType mapPaymentMethodToInsuranceType(String paymentMethod) {
+        if (paymentMethod == null) {
+            return InsuranceType.SELF_PAY;
+        }
+
+        return switch (paymentMethod.toUpperCase()) {
+            case "BPJS" -> InsuranceType.BPJS;
+            case "INSURANCE" -> InsuranceType.PRIVATE_INSURANCE;
+            case "COMPANY" -> InsuranceType.CORPORATE;
+            case "GOVERNMENT" -> InsuranceType.GOVERNMENT;
+            default -> InsuranceType.SELF_PAY;
+        };
     }
 }

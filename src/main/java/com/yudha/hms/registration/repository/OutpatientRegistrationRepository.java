@@ -187,4 +187,35 @@ public interface OutpatientRegistrationRepository extends JpaRepository<Outpatie
         RegistrationType registrationType,
         LocalDate date
     );
+
+    // ========== Queue Management Methods ==========
+
+    /**
+     * Find registrations by polyclinic, date, and status ordered by queue number.
+     * Used for queue calling - get waiting patients.
+     */
+    List<OutpatientRegistration> findByPolyclinicIdAndRegistrationDateAndStatusOrderByQueueNumberAsc(
+        UUID polyclinicId,
+        LocalDate registrationDate,
+        RegistrationStatus status
+    );
+
+    /**
+     * Find registrations by polyclinic and date ordered by queue number.
+     * Used for queue dashboard - get all patients for the day.
+     */
+    List<OutpatientRegistration> findByPolyclinicIdAndRegistrationDateOrderByQueueNumberAsc(
+        UUID polyclinicId,
+        LocalDate registrationDate
+    );
+
+    /**
+     * Find registration by polyclinic, queue number, and date.
+     * Used for calling specific queue number.
+     */
+    Optional<OutpatientRegistration> findByPolyclinicIdAndQueueNumberAndRegistrationDate(
+        UUID polyclinicId,
+        Integer queueNumber,
+        LocalDate registrationDate
+    );
 }

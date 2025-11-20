@@ -8,33 +8,54 @@ package com.yudha.hms.registration.entity;
  * @since 2025-01-19
  */
 public enum EmergencyStatus {
-    REGISTERED("Registered"),
-    TRIAGED("Triaged"),
-    IN_TREATMENT("In Treatment"),
-    WAITING_RESULTS("Waiting for Results"),
-    ADMITTED("Admitted to Inpatient"),
-    DISCHARGED("Discharged"),
-    LEFT_WITHOUT_TREATMENT("Left Without Treatment"),
-    TRANSFERRED("Transferred"),
-    DECEASED("Deceased");
+    REGISTERED("Registered", "Terdaftar"),
+    ARRIVED("Arrived", "Tiba"),
+    TRIAGED("Triaged", "Sudah Triage"),
+    IN_TREATMENT("In Treatment", "Dalam Perawatan"),
+    WAITING_RESULTS("Waiting for Results", "Menunggu Hasil"),
+    ADMITTED("Admitted to Inpatient", "Dirawat Inap"),
+    DISCHARGED("Discharged", "Pulang"),
+    LEFT_WITHOUT_TREATMENT("Left Without Treatment", "Pulang Paksa"),
+    TRANSFERRED("Transferred", "Dirujuk"),
+    DECEASED("Deceased", "Meninggal");
 
     private final String displayName;
+    private final String indonesianName;
 
-    EmergencyStatus(String displayName) {
+    EmergencyStatus(String displayName, String indonesianName) {
         this.displayName = displayName;
+        this.indonesianName = indonesianName;
     }
 
     public String getDisplayName() {
         return displayName;
     }
 
+    public String getIndonesianName() {
+        return indonesianName;
+    }
+
     public boolean isActive() {
-        return this == REGISTERED || this == TRIAGED ||
+        return this == REGISTERED || this == ARRIVED || this == TRIAGED ||
                this == IN_TREATMENT || this == WAITING_RESULTS;
     }
 
     public boolean isCompleted() {
         return this == ADMITTED || this == DISCHARGED ||
                this == LEFT_WITHOUT_TREATMENT || this == TRANSFERRED || this == DECEASED;
+    }
+
+    /**
+     * Check if patient can be triaged from current status.
+     */
+    public boolean canBeTriage() {
+        return this == REGISTERED || this == ARRIVED;
+    }
+
+    /**
+     * Check if treatment can be started from current status.
+     */
+    public boolean canStartTreatment() {
+        return this == ARRIVED || this == TRIAGED;
     }
 }
