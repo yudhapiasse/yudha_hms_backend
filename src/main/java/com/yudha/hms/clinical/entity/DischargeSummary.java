@@ -10,6 +10,8 @@ import org.hibernate.annotations.Comment;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -63,13 +65,10 @@ public class DischargeSummary extends AuditableEntity {
     @Column(name = "discharge_time")
     private LocalTime dischargeTime;
 
-    @Column(name = "discharge_type", nullable = false, length = 30)
-    @NotBlank(message = "Discharge type is required")
-    private String dischargeType; // ROUTINE, AGAINST_MEDICAL_ADVICE, TRANSFER, DECEASED
-
-    @Column(name = "discharge_disposition", nullable = false, length = 50)
-    @NotBlank(message = "Discharge disposition is required")
-    private String dischargeDisposition;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discharge_disposition", nullable = false)
+    @NotNull(message = "Discharge disposition is required")
+    private DischargeDisposition dischargeDisposition;
 
     // ========== Clinical Summary ==========
     @Column(name = "admission_date")
@@ -99,8 +98,10 @@ public class DischargeSummary extends AuditableEntity {
     private String secondaryDiagnoses;
 
     // ========== Final Condition ==========
-    @Column(name = "condition_at_discharge", length = 50)
-    private String conditionAtDischarge; // IMPROVED, STABLE, DETERIORATED, DECEASED
+    @Enumerated(EnumType.STRING)
+    @Column(name = "discharge_condition", nullable = false)
+    @NotNull(message = "Discharge condition is required")
+    private DischargeCondition dischargeCondition;
 
     @Column(name = "vital_signs_at_discharge", columnDefinition = "TEXT")
     private String vitalSignsAtDischarge;
@@ -196,7 +197,36 @@ public class DischargeSummary extends AuditableEntity {
     @Column(name = "document_generated_at")
     private LocalDateTime documentGeneratedAt;
 
+    // ========== Related Entities ==========
+    @OneToMany(mappedBy = "dischargeSummary", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<DischargePrescription> prescriptions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "dischargeSummary", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<DischargeInstruction> instructions = new ArrayList<>();
+
     // ========== Business Methods ==========
+
+    public void addPrescription(DischargePrescription prescription) {
+        prescriptions.add(prescription);
+        prescription.setDischargeSummary(this);
+    }
+
+    public void removePrescription(DischargePrescription prescription) {
+        prescriptions.remove(prescription);
+        prescription.setDischargeSummary(null);
+    }
+
+    public void addInstruction(DischargeInstruction instruction) {
+        instructions.add(instruction);
+        instruction.setDischargeSummary(this);
+    }
+
+    public void removeInstruction(DischargeInstruction instruction) {
+        instructions.remove(instruction);
+        instruction.setDischargeSummary(null);
+    }
 
     public void sign(UUID doctorId, String doctorName) {
         this.signed = true;
