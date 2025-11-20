@@ -55,24 +55,41 @@ public class DepartmentTransfer extends AuditableEntity {
     private UUID patientId;
 
     // ========== Transfer Details ==========
+    // Department IDs (if using department master table)
+    @Column(name = "from_department_id")
+    private UUID fromDepartmentId;
+
+    @Column(name = "to_department_id")
+    private UUID toDepartmentId;
+
+    // Department names (for display and backward compatibility)
     @Column(name = "from_department", nullable = false, length = 100)
     @NotBlank(message = "From department is required")
     private String fromDepartment;
-
-    @Column(name = "from_location", length = 200)
-    private String fromLocation;
 
     @Column(name = "to_department", nullable = false, length = 100)
     @NotBlank(message = "To department is required")
     private String toDepartment;
 
+    // Location IDs (bed/room if using location master table)
+    @Column(name = "from_location_id")
+    private UUID fromLocationId;
+
+    @Column(name = "to_location_id")
+    private UUID toLocationId;
+
+    // Location names (for display and backward compatibility)
+    @Column(name = "from_location", length = 200)
+    private String fromLocation;
+
     @Column(name = "to_location", length = 200)
     private String toLocation;
 
     // ========== Transfer Type ==========
+    @Enumerated(EnumType.STRING)
     @Column(name = "transfer_type", nullable = false, length = 30)
-    @NotBlank(message = "Transfer type is required")
-    private String transferType; // INTERNAL, EXTERNAL, ICU, WARD, OPERATING_ROOM
+    @NotNull(message = "Transfer type is required")
+    private TransferType transferType;
 
     // ========== Timing ==========
     @Column(name = "transfer_requested_at", nullable = false)
@@ -87,10 +104,11 @@ public class DepartmentTransfer extends AuditableEntity {
     private LocalDateTime transferCompletedAt;
 
     // ========== Status ==========
+    @Enumerated(EnumType.STRING)
     @Column(name = "transfer_status", nullable = false, length = 20)
-    @NotBlank(message = "Transfer status is required")
+    @NotNull(message = "Transfer status is required")
     @Builder.Default
-    private String transferStatus = "REQUESTED"; // REQUESTED, ACCEPTED, IN_TRANSIT, COMPLETED, REJECTED, CANCELLED
+    private TransferStatus transferStatus = TransferStatus.REQUESTED;
 
     // ========== Request Details ==========
     @Column(name = "requested_by_id")
@@ -99,12 +117,36 @@ public class DepartmentTransfer extends AuditableEntity {
     @Column(name = "requested_by_name", length = 200)
     private String requestedByName;
 
+    // Transferring practitioner (who is sending the patient)
+    @Column(name = "transferring_practitioner_id")
+    private UUID transferringPractitionerId;
+
+    @Column(name = "transferring_practitioner_name", length = 200)
+    private String transferringPractitionerName;
+
     @Column(name = "reason_for_transfer", columnDefinition = "TEXT", nullable = false)
     @NotBlank(message = "Reason for transfer is required")
     private String reasonForTransfer;
 
     @Column(name = "urgency", length = 20)
     private String urgency; // ROUTINE, URGENT, EMERGENCY
+
+    // ========== Approval (for ICU/special care transfers) ==========
+    @Column(name = "requires_approval")
+    @Builder.Default
+    private Boolean requiresApproval = false;
+
+    @Column(name = "approved_by_id")
+    private UUID approvedById;
+
+    @Column(name = "approved_by_name", length = 200)
+    private String approvedByName;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
+    @Column(name = "approval_notes", columnDefinition = "TEXT")
+    private String approvalNotes;
 
     // ========== Acceptance/Rejection ==========
     @Column(name = "accepted_by_id")
@@ -117,6 +159,12 @@ public class DepartmentTransfer extends AuditableEntity {
     private String rejectionReason;
 
     // ========== Receiving Team ==========
+    @Column(name = "receiving_practitioner_id")
+    private UUID receivingPractitionerId;
+
+    @Column(name = "receiving_practitioner_name", length = 200)
+    private String receivingPractitionerName;
+
     @Column(name = "receiving_doctor_id")
     private UUID receivingDoctorId;
 
@@ -165,39 +213,146 @@ public class DepartmentTransfer extends AuditableEntity {
 
     // ========== Business Methods ==========
 
+    /**
+     * Change transfer status with validation.
+     *
+     * @param newStatus the target status
+     * @throws com.yudha.hms.clinical.exception.InvalidStatusTransitionException if transition is invalid
+     */
+    public void changeStatus(TransferStatus newStatus) {
+        if (!this.transferStatus.canTransitionTo(newStatus)) {
+            throw new com.yudha.hms.clinical.exception.InvalidStatusTransitionException(
+                String.format("Transfer status transition from %s to %s is not allowed",
+                    transferStatus.getIndonesianName(), newStatus.getIndonesianName())
+            );
+        }
+
+        this.transferStatus = newStatus;
+        updateTimestampsForStatus(newStatus);
+    }
+
+    /**
+     * Update timestamps based on new status.
+     */
+    private void updateTimestampsForStatus(TransferStatus newStatus) {
+        LocalDateTime now = LocalDateTime.now();
+        switch (newStatus) {
+            case APPROVED -> approvedAt = now;
+            case ACCEPTED -> transferAcceptedAt = now;
+            case COMPLETED -> transferCompletedAt = now;
+            case CANCELLED -> cancelledAt = now;
+        }
+    }
+
+    /**
+     * Request approval for transfer (for ICU/special care transfers).
+     */
+    public void requestApproval() {
+        if (this.transferType.requiresApproval()) {
+            this.requiresApproval = true;
+            changeStatus(TransferStatus.PENDING_APPROVAL);
+        }
+    }
+
+    /**
+     * Approve transfer request.
+     *
+     * @param approvedById ID of approver
+     * @param approvedByName name of approver
+     * @param notes approval notes
+     */
+    public void approve(UUID approvedById, String approvedByName, String notes) {
+        changeStatus(TransferStatus.APPROVED);
+        this.approvedById = approvedById;
+        this.approvedByName = approvedByName;
+        this.approvalNotes = notes;
+    }
+
+    /**
+     * Accept transfer request.
+     *
+     * @param acceptedById ID of person accepting
+     * @param acceptedByName name of person accepting
+     */
     public void accept(UUID acceptedById, String acceptedByName) {
-        this.transferStatus = "ACCEPTED";
-        this.transferAcceptedAt = LocalDateTime.now();
+        changeStatus(TransferStatus.ACCEPTED);
         this.acceptedById = acceptedById;
         this.acceptedByName = acceptedByName;
     }
 
+    /**
+     * Reject transfer request.
+     *
+     * @param reason reason for rejection
+     */
     public void reject(String reason) {
-        this.transferStatus = "REJECTED";
+        changeStatus(TransferStatus.REJECTED);
         this.rejectionReason = reason;
     }
 
+    /**
+     * Start transfer (patient in transit).
+     */
     public void startTransfer() {
-        this.transferStatus = "IN_TRANSIT";
+        changeStatus(TransferStatus.IN_TRANSIT);
     }
 
+    /**
+     * Complete transfer.
+     */
     public void complete() {
-        this.transferStatus = "COMPLETED";
-        this.transferCompletedAt = LocalDateTime.now();
+        changeStatus(TransferStatus.COMPLETED);
     }
 
+    /**
+     * Cancel transfer.
+     *
+     * @param reason reason for cancellation
+     * @param cancelledByUser user who cancelled
+     */
     public void cancel(String reason, String cancelledByUser) {
-        this.transferStatus = "CANCELLED";
-        this.cancelledAt = LocalDateTime.now();
+        if (!this.transferStatus.canBeCancelled()) {
+            throw new IllegalStateException(
+                "Cannot cancel transfer in status: " + transferStatus.getIndonesianName()
+            );
+        }
+        changeStatus(TransferStatus.CANCELLED);
         this.cancellationReason = reason;
         this.cancelledBy = cancelledByUser;
     }
 
+    /**
+     * Check if transfer is completed.
+     */
     public boolean isCompleted() {
-        return "COMPLETED".equals(transferStatus);
+        return transferStatus.isCompleted();
     }
 
+    /**
+     * Check if transfer is pending.
+     */
     public boolean isPending() {
-        return "REQUESTED".equals(transferStatus);
+        return transferStatus.isPending();
+    }
+
+    /**
+     * Check if transfer is active.
+     */
+    public boolean isActive() {
+        return transferStatus.isActive();
+    }
+
+    /**
+     * Check if transfer can be cancelled.
+     */
+    public boolean canBeCancelled() {
+        return transferStatus.canBeCancelled();
+    }
+
+    /**
+     * Check if transfer requires approval.
+     */
+    public boolean needsApproval() {
+        return Boolean.TRUE.equals(requiresApproval) || transferType.requiresApproval();
     }
 }
