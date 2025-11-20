@@ -28,6 +28,11 @@ public interface EncounterDiagnosisRepository extends JpaRepository<EncounterDia
     List<EncounterDiagnosis> findByEncounterIdOrderByRankAsc(UUID encounterId);
 
     /**
+     * Find all diagnoses by Encounter entity.
+     */
+    List<EncounterDiagnosis> findByEncounter(com.yudha.hms.clinical.entity.Encounter encounter);
+
+    /**
      * Find diagnoses by type for an encounter.
      */
     List<EncounterDiagnosis> findByEncounterIdAndDiagnosisTypeOrderByRankAsc(
