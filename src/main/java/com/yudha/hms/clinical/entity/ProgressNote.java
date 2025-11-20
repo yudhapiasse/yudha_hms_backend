@@ -133,6 +133,36 @@ public class ProgressNote extends AuditableEntity {
     @Column(name = "cosigned_at")
     private LocalDateTime cosignedAt;
 
+    // ========== Digital Signature ==========
+    @Column(name = "is_signed")
+    @Builder.Default
+    private Boolean isSigned = false;
+
+    @Column(name = "signed_at")
+    private LocalDateTime signedAt;
+
+    @Column(name = "digital_signature", columnDefinition = "TEXT")
+    private String digitalSignature; // Base64 encoded signature or signature ID
+
+    @Column(name = "signature_method", length = 50)
+    private String signatureMethod; // ELECTRONIC, BIOMETRIC, PIN, PASSWORD
+
+    @Column(name = "signature_ip_address", length = 50)
+    private String signatureIpAddress;
+
+    @Column(name = "signature_device", length = 200)
+    private String signatureDevice; // Device used for signing
+
+    @Column(name = "signature_verification_code", length = 100)
+    private String signatureVerificationCode; // For verification purposes
+
+    // ========== Template Reference ==========
+    @Column(name = "template_id")
+    private UUID templateId; // Reference to ClinicalNoteTemplate if used
+
+    @Column(name = "template_code", length = 50)
+    private String templateCode;
+
     // ========== Business Methods ==========
 
     /**
@@ -185,5 +215,30 @@ public class ProgressNote extends AuditableEntity {
             case AFTERNOON -> hour >= 15 && hour < 23;
             case NIGHT -> hour >= 23 || hour < 7;
         };
+    }
+
+    /**
+     * Sign the progress note.
+     */
+    public void sign(String signature, String method, String ipAddress, String device) {
+        this.isSigned = true;
+        this.signedAt = LocalDateTime.now();
+        this.digitalSignature = signature;
+        this.signatureMethod = method;
+        this.signatureIpAddress = ipAddress;
+        this.signatureDevice = device;
+    }
+
+    /**
+     * Check if note is fully signed (main signature and cosign if required).
+     */
+    public boolean isFullySigned() {
+        if (!Boolean.TRUE.equals(isSigned)) {
+            return false;
+        }
+        if (Boolean.TRUE.equals(requiresCosign) && !Boolean.TRUE.equals(cosigned)) {
+            return false;
+        }
+        return true;
     }
 }
