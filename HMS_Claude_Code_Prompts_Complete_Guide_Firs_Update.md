@@ -5491,7 +5491,7 @@ Include basic DICOM viewer embedding
 
 ### 11.4 Radiology Reporting
 ```
-Build radiology reporting system:
+Build a radiology reporting system:
 - Structured reporting templates
 - Voice-to-text integration preparation
 - Report verification workflow
