@@ -5398,7 +5398,7 @@ Create laboratory test catalog:
 - Test costs
 - Panel/package configurations
 - Critical value definitions
-Include age and gender-specific normal ranges
+  Include age and gender-specific normal ranges
 ```
 
 ### 10.2 Lab Order Management

@@ -109,6 +109,13 @@
             <version>2.15.1</version>
         </dependency>
 
+        <!-- Hibernate Types for PostgreSQL JSON and Array support -->
+        <dependency>
+            <groupId>io.hypersistence</groupId>
+            <artifactId>hypersistence-utils-hibernate-63</artifactId>
+            <version>3.7.3</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
