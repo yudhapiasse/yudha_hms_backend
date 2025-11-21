@@ -2,6 +2,7 @@ package com.yudha.hms.radiology.repository;
 
 import com.yudha.hms.radiology.constant.OrderPriority;
 import com.yudha.hms.radiology.constant.OrderStatus;
+import com.yudha.hms.radiology.constant.TransportationStatus;
 import com.yudha.hms.radiology.entity.RadiologyOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -114,4 +115,21 @@ public interface RadiologyOrderRepository extends JpaRepository<RadiologyOrder, 
      */
     @Query("SELECT COUNT(o) FROM RadiologyOrder o WHERE o.orderDate BETWEEN :startDate AND :endDate AND o.deletedAt IS NULL")
     long countByDateRange(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
+
+    // ========== Phase 11.2: Patient Safety and Transportation ==========
+
+    /**
+     * Find orders requiring transportation with specific status
+     */
+    List<RadiologyOrder> findByRequiresTransportationTrueAndTransportationStatusAndDeletedAtIsNull(TransportationStatus status);
+
+    /**
+     * Find orders with contrast allergy
+     */
+    List<RadiologyOrder> findByHasContrastAllergyTrueAndDeletedAtIsNull();
+
+    /**
+     * Find orders with pregnancy concern
+     */
+    List<RadiologyOrder> findByIsPregnantTrueAndDeletedAtIsNull();
 }

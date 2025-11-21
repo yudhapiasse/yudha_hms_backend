@@ -519,4 +519,102 @@ public class RadiologyOrderService {
             throw new IllegalStateException("Invalid status transition: " + from + " → " + to);
         }
     }
+
+    // ========== Phase 11.2: Patient Safety Checks ==========
+
+    /**
+     * Verify pregnancy status
+     */
+    @Transactional
+    public RadiologyOrder verifyPregnancyStatus(UUID orderId, boolean isPregnant, UUID verifiedBy) {
+        log.info("Verifying pregnancy status for order: {}, pregnant: {}", orderId, isPregnant);
+
+        RadiologyOrder order = getOrderById(orderId);
+
+        order.setIsPregnant(isPregnant);
+        order.setPregnancyVerifiedBy(verifiedBy);
+        order.setPregnancyVerifiedAt(LocalDateTime.now());
+
+        return orderRepository.save(order);
+    }
+
+    /**
+     * Verify contrast allergy status
+     */
+    @Transactional
+    public RadiologyOrder verifyContrastAllergy(UUID orderId, boolean hasAllergy,
+                                                String allergyDetails, UUID verifiedBy) {
+        log.info("Verifying contrast allergy for order: {}, has allergy: {}", orderId, hasAllergy);
+
+        RadiologyOrder order = getOrderById(orderId);
+
+        order.setHasContrastAllergy(hasAllergy);
+        order.setContrastAllergyDetails(allergyDetails);
+        order.setContrastAllergyVerifiedBy(verifiedBy);
+        order.setContrastAllergyVerifiedAt(LocalDateTime.now());
+
+        return orderRepository.save(order);
+    }
+
+    /**
+     * Request transportation
+     */
+    @Transactional
+    public RadiologyOrder requestTransportation(UUID orderId, String notes) {
+        log.info("Requesting transportation for order: {}", orderId);
+
+        RadiologyOrder order = getOrderById(orderId);
+
+        order.setRequiresTransportation(true);
+        order.setTransportationStatus(com.yudha.hms.radiology.constant.TransportationStatus.REQUESTED);
+        order.setTransportationRequestedAt(LocalDateTime.now());
+        order.setTransportationNotes(notes);
+
+        return orderRepository.save(order);
+    }
+
+    /**
+     * Update transportation status
+     */
+    @Transactional
+    public RadiologyOrder updateTransportationStatus(UUID orderId,
+                                                    com.yudha.hms.radiology.constant.TransportationStatus status) {
+        log.info("Updating transportation status for order: {} to {}", orderId, status);
+
+        RadiologyOrder order = getOrderById(orderId);
+
+        if (!Boolean.TRUE.equals(order.getRequiresTransportation())) {
+            throw new IllegalStateException("Transportation not required for this order");
+        }
+
+        order.setTransportationStatus(status);
+
+        if (status == com.yudha.hms.radiology.constant.TransportationStatus.RETURNED) {
+            order.setTransportationCompletedAt(LocalDateTime.now());
+        }
+
+        return orderRepository.save(order);
+    }
+
+    /**
+     * Get orders awaiting transportation
+     */
+    public List<RadiologyOrder> getOrdersAwaitingTransportation() {
+        return orderRepository.findByRequiresTransportationTrueAndTransportationStatusAndDeletedAtIsNull(
+                com.yudha.hms.radiology.constant.TransportationStatus.REQUESTED);
+    }
+
+    /**
+     * Get orders with contrast allergy
+     */
+    public List<RadiologyOrder> getOrdersWithContrastAllergy() {
+        return orderRepository.findByHasContrastAllergyTrueAndDeletedAtIsNull();
+    }
+
+    /**
+     * Get orders with pregnancy concern
+     */
+    public List<RadiologyOrder> getOrdersWithPregnancyConcern() {
+        return orderRepository.findByIsPregnantTrueAndDeletedAtIsNull();
+    }
 }

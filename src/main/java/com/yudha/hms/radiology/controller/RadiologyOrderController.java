@@ -3,8 +3,8 @@ package com.yudha.hms.radiology.controller;
 import com.yudha.hms.clinical.entity.Encounter;
 import com.yudha.hms.patient.entity.Patient;
 import com.yudha.hms.radiology.constant.OrderStatus;
-import com.yudha.hms.radiology.dto.request.RadiologyOrderRequest;
-import com.yudha.hms.radiology.dto.request.RadiologyOrderScheduleRequest;
+import com.yudha.hms.radiology.constant.TransportationStatus;
+import com.yudha.hms.radiology.dto.request.*;
 import com.yudha.hms.radiology.dto.response.ApiResponse;
 import com.yudha.hms.radiology.dto.response.PageResponse;
 import com.yudha.hms.radiology.dto.response.RadiologyOrderItemResponse;
@@ -232,6 +232,128 @@ public class RadiologyOrderController {
         log.info("Radiology order deleted successfully: {}", id);
 
         return ResponseEntity.ok(ApiResponse.success("Order deleted successfully"));
+    }
+
+    // ========== Phase 11.2: Patient Safety Checks ==========
+
+    /**
+     * Verify pregnancy status
+     */
+    @PostMapping("/{id}/verify-pregnancy")
+    public ResponseEntity<ApiResponse<RadiologyOrderResponse>> verifyPregnancyStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody VerifyPregnancyStatusRequest request) {
+        log.info("Verifying pregnancy status for order: {}", id);
+
+        RadiologyOrder order = orderService.verifyPregnancyStatus(
+                id,
+                request.getIsPregnant(),
+                request.getVerifiedBy());
+        RadiologyOrderResponse response = toResponse(order);
+
+        log.info("Pregnancy status verified");
+
+        return ResponseEntity.ok(ApiResponse.success("Pregnancy status verified", response));
+    }
+
+    /**
+     * Verify contrast allergy
+     */
+    @PostMapping("/{id}/verify-contrast-allergy")
+    public ResponseEntity<ApiResponse<RadiologyOrderResponse>> verifyContrastAllergy(
+            @PathVariable UUID id,
+            @Valid @RequestBody VerifyContrastAllergyRequest request) {
+        log.info("Verifying contrast allergy for order: {}", id);
+
+        RadiologyOrder order = orderService.verifyContrastAllergy(
+                id,
+                request.getHasAllergy(),
+                request.getAllergyDetails(),
+                request.getVerifiedBy());
+        RadiologyOrderResponse response = toResponse(order);
+
+        log.info("Contrast allergy verified");
+
+        return ResponseEntity.ok(ApiResponse.success("Contrast allergy verified", response));
+    }
+
+    /**
+     * Request patient transportation
+     */
+    @PostMapping("/{id}/request-transportation")
+    public ResponseEntity<ApiResponse<RadiologyOrderResponse>> requestTransportation(
+            @PathVariable UUID id,
+            @Valid @RequestBody RequestTransportationRequest request) {
+        log.info("Requesting transportation for order: {}", id);
+
+        RadiologyOrder order = orderService.requestTransportation(id, request.getNotes());
+        RadiologyOrderResponse response = toResponse(order);
+
+        log.info("Transportation requested");
+
+        return ResponseEntity.ok(ApiResponse.success("Transportation requested", response));
+    }
+
+    /**
+     * Update transportation status
+     */
+    @PostMapping("/{id}/transportation-status")
+    public ResponseEntity<ApiResponse<RadiologyOrderResponse>> updateTransportationStatus(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateTransportationStatusRequest request) {
+        log.info("Updating transportation status for order: {} to {}", id, request.getStatus());
+
+        RadiologyOrder order = orderService.updateTransportationStatus(id, request.getStatus());
+        RadiologyOrderResponse response = toResponse(order);
+
+        log.info("Transportation status updated");
+
+        return ResponseEntity.ok(ApiResponse.success("Transportation status updated", response));
+    }
+
+    /**
+     * Get orders awaiting transportation
+     */
+    @GetMapping("/awaiting-transportation")
+    public ResponseEntity<ApiResponse<List<RadiologyOrderResponse>>> getOrdersAwaitingTransportation() {
+        log.info("Fetching orders awaiting transportation");
+
+        List<RadiologyOrder> orders = orderService.getOrdersAwaitingTransportation();
+        List<RadiologyOrderResponse> responses = orders.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.success(responses));
+    }
+
+    /**
+     * Get orders with contrast allergy
+     */
+    @GetMapping("/contrast-allergy")
+    public ResponseEntity<ApiResponse<List<RadiologyOrderResponse>>> getOrdersWithContrastAllergy() {
+        log.info("Fetching orders with contrast allergy");
+
+        List<RadiologyOrder> orders = orderService.getOrdersWithContrastAllergy();
+        List<RadiologyOrderResponse> responses = orders.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.success(responses));
+    }
+
+    /**
+     * Get orders with pregnancy concern
+     */
+    @GetMapping("/pregnancy-concern")
+    public ResponseEntity<ApiResponse<List<RadiologyOrderResponse>>> getOrdersWithPregnancyConcern() {
+        log.info("Fetching orders with pregnancy concern");
+
+        List<RadiologyOrder> orders = orderService.getOrdersWithPregnancyConcern();
+        List<RadiologyOrderResponse> responses = orders.stream()
+                .map(this::toResponse)
+                .collect(Collectors.toList());
+
+        return ResponseEntity.ok(ApiResponse.success(responses));
     }
 
     /**

@@ -4,6 +4,7 @@ import com.yudha.hms.clinical.entity.Encounter;
 import com.yudha.hms.patient.entity.Patient;
 import com.yudha.hms.radiology.constant.OrderPriority;
 import com.yudha.hms.radiology.constant.OrderStatus;
+import com.yudha.hms.radiology.constant.TransportationStatus;
 import com.yudha.hms.shared.entity.SoftDeletableEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -144,4 +145,85 @@ public class RadiologyOrder extends SoftDeletableEntity {
      */
     @Column(name = "special_instructions", columnDefinition = "TEXT")
     private String specialInstructions;
+
+    // ========== Phase 11.2: Patient Safety Checks ==========
+
+    /**
+     * Is patient pregnant? (for female patients)
+     */
+    @Column(name = "is_pregnant")
+    @Builder.Default
+    private Boolean isPregnant = false;
+
+    /**
+     * Who verified pregnancy status
+     */
+    @Column(name = "pregnancy_verified_by")
+    private UUID pregnancyVerifiedBy;
+
+    /**
+     * When was pregnancy status verified
+     */
+    @Column(name = "pregnancy_verified_at")
+    private LocalDateTime pregnancyVerifiedAt;
+
+    /**
+     * Does patient have contrast allergy?
+     */
+    @Column(name = "has_contrast_allergy")
+    @Builder.Default
+    private Boolean hasContrastAllergy = false;
+
+    /**
+     * Details of contrast allergy
+     */
+    @Column(name = "contrast_allergy_details", columnDefinition = "TEXT")
+    private String contrastAllergyDetails;
+
+    /**
+     * Who verified contrast allergy status
+     */
+    @Column(name = "contrast_allergy_verified_by")
+    private UUID contrastAllergyVerifiedBy;
+
+    /**
+     * When was contrast allergy status verified
+     */
+    @Column(name = "contrast_allergy_verified_at")
+    private LocalDateTime contrastAllergyVerifiedAt;
+
+    // ========== Phase 11.2: Transportation Coordination ==========
+
+    /**
+     * Does patient require transportation? (typically for inpatients)
+     */
+    @Column(name = "requires_transportation")
+    @Builder.Default
+    private Boolean requiresTransportation = false;
+
+    /**
+     * Transportation status
+     */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "transportation_status", length = 50)
+    @Builder.Default
+    private TransportationStatus transportationStatus = TransportationStatus.NOT_REQUIRED;
+
+    /**
+     * When was transportation requested
+     */
+    @Column(name = "transportation_requested_at")
+    private LocalDateTime transportationRequestedAt;
+
+    /**
+     * When was transportation completed (patient returned to ward)
+     */
+    @Column(name = "transportation_completed_at")
+    private LocalDateTime transportationCompletedAt;
+
+    /**
+     * Transportation notes
+     */
+    @Column(name = "transportation_notes", columnDefinition = "TEXT")
+    private String transportationNotes;
 }
