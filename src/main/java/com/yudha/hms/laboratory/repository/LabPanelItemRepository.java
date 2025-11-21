@@ -31,14 +31,9 @@ public interface LabPanelItemRepository extends JpaRepository<LabPanelItem, UUID
     List<LabPanelItem> findByPanelIdOrderByDisplayOrder(UUID panelId);
 
     /**
-     * Find items by panel ordered by sequence
-     */
-    List<LabPanelItem> findByPanelIdOrderBySequenceAsc(UUID panelId);
-
-    /**
      * Find mandatory items by panel
      */
-    List<LabPanelItem> findByPanelIdAndIsMandatoryTrueOrderBySequenceAsc(UUID panelId);
+    List<LabPanelItem> findByPanelIdAndIsMandatoryTrueOrderByDisplayOrder(UUID panelId);
 
     /**
      * Find by panel and test

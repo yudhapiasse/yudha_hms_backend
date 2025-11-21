@@ -39,7 +39,7 @@ public class SpecimenService {
     private final BarcodeGenerationService barcodeGenerationService;
 
     /**
-     * Create new specimen
+     * Create a new specimen
      */
     public Specimen createSpecimen(Specimen specimen) {
         log.info("Creating new specimen for order item: {}", specimen.getOrderItem().getId());

@@ -1,0 +1,306 @@
+=============================================================================
+RADIOLOGY MODULE - PHASE 11.1: RADIOLOGY EXAMINATION MASTER
+Complete Database Schema and Java Implementation
+=============================================================================
+
+Created: 2025-01-21
+Author: HMS Development Team
+Version: 1.0.0
+
+=============================================================================
+SUMMARY
+=============================================================================
+
+Total Files Created: 29
+- 1  Database Migration Script
+- 7  Enum Constant Classes (with Indonesian language support)
+- 10 Entity Classes (with JPA annotations and relationships)
+- 10 Repository Interfaces (with custom query methods)
+- 1  Package Documentation
+
+Total Database Tables: 10
+- 4 Master Data Tables
+- 6 Transactional Tables
+
+Initial Data: 8 Radiology Modalities
+
+=============================================================================
+FILES CREATED
+=============================================================================
+
+1. DATABASE MIGRATION
+---------------------
+✓ src/main/resources/db/migration/V35__create_radiology_module_tables.sql
+  - Creates radiology_schema
+  - Creates 10 tables with proper indexes and constraints
+  - Includes trigger for updated_at columns
+  - Seeds 8 initial modality records
+
+2. ENUM CONSTANTS (7 files)
+----------------------------
+✓ src/main/java/com/yudha/hms/radiology/constant/ModalityType.java
+  - XRAY, CT_SCAN, MRI, ULTRASOUND, MAMMOGRAPHY, FLUOROSCOPY, DEXA, ANGIOGRAPHY, NUCLEAR_MEDICINE, PET_SCAN
+  - Method: usesRadiation()
+
+✓ src/main/java/com/yudha/hms/radiology/constant/OrderPriority.java
+  - ROUTINE, URGENT, EMERGENCY
+  - Method: getExpectedCompletionHours()
+
+✓ src/main/java/com/yudha/hms/radiology/constant/OrderStatus.java
+  - PENDING, SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED
+  - Methods: isTerminal(), canBeCancelled(), canBeScheduled()
+
+✓ src/main/java/com/yudha/hms/radiology/constant/Laterality.java
+  - LEFT, RIGHT, BILATERAL, NOT_APPLICABLE
+  - Method: isSingleSide()
+
+✓ src/main/java/com/yudha/hms/radiology/constant/ContrastType.java
+  - NONE, IODINE_BASED, GADOLINIUM_BASED, BARIUM_BASED, MICROBUBBLE
+  - Methods: isContrastRequired(), requiresRenalFunctionCheck()
+
+✓ src/main/java/com/yudha/hms/radiology/constant/ReactionSeverity.java
+  - NONE, MILD, MODERATE, SEVERE
+  - Methods: requiresEmergencyIntervention(), requiresMedicalAttention()
+
+✓ src/main/java/com/yudha/hms/radiology/constant/MaintenanceType.java
+  - PREVENTIVE, CORRECTIVE, CALIBRATION
+  - Methods: isScheduled(), isUnplanned()
+
+3. ENTITY CLASSES (10 files)
+-----------------------------
+✓ src/main/java/com/yudha/hms/radiology/entity/RadiologyModality.java
+  - Imaging modality master (X-Ray, CT, MRI, etc.)
+  - Extends SoftDeletableEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/RadiologyExamination.java
+  - Examination catalog with CPT codes
+  - Many-to-One: RadiologyModality
+  - Extends SoftDeletableEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/RadiologyRoom.java
+  - Imaging rooms and equipment
+  - Many-to-One: RadiologyModality
+  - Extends SoftDeletableEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/ReportingTemplate.java
+  - Report templates with JSONB sections
+  - Many-to-One: RadiologyExamination
+  - Extends SoftDeletableEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/RadiologyOrder.java
+  - Radiology examination orders
+  - Many-to-One: Patient, Encounter, RadiologyRoom
+  - Extends SoftDeletableEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/RadiologyOrderItem.java
+  - Order line items with laterality
+  - Many-to-One: RadiologyOrder, RadiologyExamination
+  - Extends BaseEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/RadiologyResult.java
+  - Examination results and reports
+  - Many-to-One: RadiologyOrderItem, RadiologyExamination, Patient
+  - Extends SoftDeletableEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/RadiologyImage.java
+  - DICOM images with study/series/instance UIDs
+  - Many-to-One: RadiologyResult
+  - Extends BaseEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/ContrastAdministration.java
+  - Contrast media tracking and reactions
+  - Many-to-One: RadiologyOrderItem, Patient
+  - Extends BaseEntity
+
+✓ src/main/java/com/yudha/hms/radiology/entity/EquipmentMaintenance.java
+  - Equipment maintenance log
+  - Many-to-One: RadiologyRoom
+  - Extends BaseEntity
+
+4. REPOSITORY INTERFACES (10 files)
+------------------------------------
+✓ src/main/java/com/yudha/hms/radiology/repository/RadiologyModalityRepository.java
+  - Find by code, search by name/code
+  - Filter by radiation requirement
+  - 8 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/RadiologyExaminationRepository.java
+  - Find by exam code, CPT code
+  - Filter by modality, body part, contrast requirement
+  - Search examinations
+  - 15 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/RadiologyRoomRepository.java
+  - Find by room code
+  - Filter by modality, operational status, availability
+  - Find rooms needing calibration
+  - 12 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/ReportingTemplateRepository.java
+  - Find by template code
+  - Find default template by examination
+  - Filter by examination
+  - 5 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/RadiologyOrderRepository.java
+  - Find by order number
+  - Filter by patient, status, priority, scheduled date
+  - Find urgent orders
+  - Search orders by number/patient
+  - 15 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/RadiologyOrderItemRepository.java
+  - Find by order, examination, status
+  - Find pending items
+  - 6 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/RadiologyResultRepository.java
+  - Find by result number, order item, DICOM study ID
+  - Filter by patient, examination, finalization status
+  - Find results awaiting radiologist
+  - Search results
+  - 15 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/RadiologyImageRepository.java
+  - Find by result, DICOM UIDs
+  - Find key images
+  - 6 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/ContrastAdministrationRepository.java
+  - Find by patient, order item
+  - Find administrations with reactions
+  - Find severe reactions
+  - Patient contrast history
+  - 10 custom query methods
+
+✓ src/main/java/com/yudha/hms/radiology/repository/EquipmentMaintenanceRepository.java
+  - Find by room, maintenance type
+  - Find pending, overdue, upcoming maintenance
+  - Maintenance and calibration history
+  - 12 custom query methods
+
+5. DOCUMENTATION
+----------------
+✓ src/main/java/com/yudha/hms/radiology/package-info.java
+  - Comprehensive package documentation
+  - Module structure and features
+  - Database schema overview
+  - Integration points
+
+✓ RADIOLOGY_MODULE_SCHEMA_DESIGN.md
+  - Complete schema design documentation
+  - Table specifications
+  - Entity relationships
+  - Repository method details
+  - Design patterns
+  - Integration points
+
+=============================================================================
+DATABASE TABLES CREATED
+=============================================================================
+
+MASTER DATA TABLES:
+1. radiology_modality          - Imaging modality master
+2. radiology_examination        - Examination catalog
+3. radiology_room               - Imaging rooms and equipment
+4. reporting_template           - Report templates
+
+TRANSACTIONAL TABLES:
+5. radiology_order              - Examination orders
+6. radiology_order_item         - Order line items
+7. radiology_result             - Examination results
+8. radiology_image              - DICOM images
+9. contrast_administration      - Contrast tracking
+10. equipment_maintenance       - Maintenance log
+
+=============================================================================
+KEY FEATURES
+=============================================================================
+
+11.1 RADIOLOGY EXAMINATION MASTER
+- Modality management (X-Ray, CT, MRI, USG, Mammography, etc.)
+- Examination catalog with CPT codes and ICD procedure codes
+- Preparation instructions and contrast requirements
+- Room and equipment tracking with maintenance scheduling
+- Reporting templates with JSONB sections
+
+11.2 ORDER MANAGEMENT
+- Priority-based ordering (ROUTINE, URGENT, EMERGENCY)
+- Scheduling and room assignment
+- Laterality support (LEFT, RIGHT, BILATERAL)
+- Status workflow management
+
+11.3 RESULT ENTRY AND REPORTING
+- Structured reporting (findings, impression, recommendations)
+- DICOM image management
+- Radiologist workflow with finalization
+- Result amendment tracking
+
+11.4 CONTRAST AND MAINTENANCE
+- Contrast media tracking and reaction monitoring
+- Equipment maintenance scheduling
+- Calibration tracking and alerts
+
+=============================================================================
+DESIGN PATTERNS
+=============================================================================
+
+✓ Soft Delete Pattern
+  - deleted_at timestamp for all master data
+  - Queries filter deleted_at IS NULL
+
+✓ Audit Trail
+  - created_at, created_by, updated_at, updated_by
+  - Automatic updated_at via database trigger
+
+✓ Optimistic Locking
+  - version field for concurrent update detection
+
+✓ UUID Primary Keys
+  - gen_random_uuid() for distributed system compatibility
+
+✓ Indonesian Language Support
+  - All enums include Indonesian translations
+  - displayNameId property for each enum value
+
+✓ Proper Indexing
+  - Unique indexes for codes and numbers
+  - Standard indexes for foreign keys and search columns
+  - Filtered indexes for specific queries
+
+=============================================================================
+INTEGRATION POINTS
+=============================================================================
+
+✓ Patient Module (patient_schema.patient)
+  - radiology_order.patient_id
+  - radiology_result.patient_id
+  - contrast_administration.patient_id
+
+✓ Clinical Module (clinical_schema.encounter)
+  - radiology_order.encounter_id
+
+✓ DICOM/PACS Systems
+  - radiology_image stores DICOM UIDs
+  - File path references to PACS storage
+
+=============================================================================
+NEXT STEPS
+=============================================================================
+
+1. Apply the migration:
+   ./mvnw flyway:migrate
+
+2. Verify tables created:
+   \dt radiology_schema.*
+
+3. Verify initial data:
+   SELECT * FROM radiology_schema.radiology_modality;
+
+4. Create service layer (Phase 11.2)
+5. Create REST API controllers (Phase 11.3)
+6. Create DTOs and mappers (Phase 11.4)
+
+=============================================================================
+END OF FILE LIST
+=============================================================================

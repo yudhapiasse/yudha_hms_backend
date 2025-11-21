@@ -163,8 +163,7 @@ public class LabPanelService {
      */
     @Transactional(readOnly = true)
     public List<LabPanel> getAllActivePanels() {
-        // TODO: Repository method may not exist - implement in repository if needed
-        return labPanelRepository.findByActiveTrueAndDeletedAtIsNullOrderByPanelNameAsc();
+        return labPanelRepository.findByActiveTrueAndDeletedAtIsNullOrderByNameAsc();
     }
 
     /**
@@ -172,8 +171,7 @@ public class LabPanelService {
      */
     @Transactional(readOnly = true)
     public List<LabPanel> getPanelsByCategory(UUID categoryId) {
-        // TODO: Repository method may not exist - implement in repository if needed
-        return labPanelRepository.findByCategoryIdAndActiveTrueAndDeletedAtIsNullOrderByPanelNameAsc(categoryId);
+        return labPanelRepository.findByCategoryIdAndActiveTrueAndDeletedAtIsNullOrderByNameAsc(categoryId);
     }
 
     /**
@@ -289,7 +287,7 @@ public class LabPanelService {
      */
     @Transactional(readOnly = true)
     public List<LabPanelItem> getMandatoryPanelItems(UUID panelId) {
-        return labPanelItemRepository.findByPanelIdAndIsMandatoryTrueOrderBySequenceAsc(panelId);
+        return labPanelItemRepository.findByPanelIdAndIsMandatoryTrueOrderByDisplayOrder(panelId);
     }
 
     /**

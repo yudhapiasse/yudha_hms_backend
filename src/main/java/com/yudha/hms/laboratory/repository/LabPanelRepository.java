@@ -40,7 +40,7 @@ public interface LabPanelRepository extends JpaRepository<LabPanel, UUID> {
     /**
      * Find all active panels (list)
      */
-    List<LabPanel> findByActiveTrueAndDeletedAtIsNullOrderByPanelNameAsc();
+    List<LabPanel> findByActiveTrueAndDeletedAtIsNullOrderByNameAsc();
 
     /**
      * Find popular panels
@@ -56,7 +56,7 @@ public interface LabPanelRepository extends JpaRepository<LabPanel, UUID> {
     /**
      * Find by category and active
      */
-    List<LabPanel> findByCategoryIdAndActiveTrueAndDeletedAtIsNullOrderByPanelNameAsc(UUID categoryId);
+    List<LabPanel> findByCategoryIdAndActiveTrueAndDeletedAtIsNullOrderByNameAsc(UUID categoryId);
 
     /**
      * Search panels by name or code
