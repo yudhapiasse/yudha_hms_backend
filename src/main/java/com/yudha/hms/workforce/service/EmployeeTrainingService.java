@@ -58,12 +58,6 @@ public class EmployeeTrainingService {
     }
 
     @Transactional(readOnly = true)
-    public BigDecimal getTotalSkpCredits(UUID employeeId, LocalDate fromDate) {
-        BigDecimal total = employeeTrainingRepository.sumSkpCreditsByEmployeeSinceDate(employeeId, fromDate);
-        return total != null ? total : BigDecimal.ZERO;
-    }
-
-    @Transactional(readOnly = true)
     public Long countCompletedTrainings(UUID employeeId) {
         return employeeTrainingRepository.countCompletedTrainingsByEmployee(employeeId);
     }
@@ -79,18 +73,25 @@ public class EmployeeTrainingService {
 
         training.setTrainingType(trainingDetails.getTrainingType());
         training.setTrainingName(trainingDetails.getTrainingName());
-        training.setProvider(trainingDetails.getProvider());
+        training.setTrainingProvider(trainingDetails.getTrainingProvider());
+        training.setTrainingCategory(trainingDetails.getTrainingCategory());
         training.setStartDate(trainingDetails.getStartDate());
         training.setEndDate(trainingDetails.getEndDate());
         training.setDurationHours(trainingDetails.getDurationHours());
         training.setLocation(trainingDetails.getLocation());
-        training.setCompletionStatus(trainingDetails.getCompletionStatus());
+        training.setIssuesCertificate(trainingDetails.getIssuesCertificate());
         training.setCertificateNumber(trainingDetails.getCertificateNumber());
-        training.setCertificateExpiryDate(trainingDetails.getCertificateExpiryDate());
-        training.setSkpCredits(trainingDetails.getSkpCredits());
-        training.setCost(trainingDetails.getCost());
-        training.setSponsoredBy(trainingDetails.getSponsoredBy());
         training.setCertificateUrl(trainingDetails.getCertificateUrl());
+        training.setCertificateExpiryDate(trainingDetails.getCertificateExpiryDate());
+        training.setIsMandatory(trainingDetails.getIsMandatory());
+        training.setIsRegulatoryRequired(trainingDetails.getIsRegulatoryRequired());
+        training.setTrainingCost(trainingDetails.getTrainingCost());
+        training.setCurrency(trainingDetails.getCurrency());
+        training.setPaidBy(trainingDetails.getPaidBy());
+        training.setAttended(trainingDetails.getAttended());
+        training.setCompletionStatus(trainingDetails.getCompletionStatus());
+        training.setEvaluationScore(trainingDetails.getEvaluationScore());
+        training.setPassFailStatus(trainingDetails.getPassFailStatus());
         training.setNotes(trainingDetails.getNotes());
 
         return employeeTrainingRepository.save(training);

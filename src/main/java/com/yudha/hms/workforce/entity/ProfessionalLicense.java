@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -39,31 +40,43 @@ public class ProfessionalLicense extends SoftDeletableEntity {
     @Column(name = "expiry_date", nullable = false)
     private LocalDate expiryDate;
 
-    @Column(name = "specialization", length = 200)
+    @Column(name = "is_expired", nullable = false)
+    private Boolean isExpired = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "renewal_status", length = 30)
+    private LicenseRenewalStatus renewalStatus;
+
+    @Column(name = "renewal_reminder_sent", nullable = false)
+    private Boolean renewalReminderSent = false;
+
+    @Column(name = "last_reminder_date")
+    private LocalDate lastReminderDate;
+
+    @Column(name = "profession", length = 100)
+    private String profession;
+
+    @Column(name = "specialization", length = 100)
     private String specialization;
+
+    @Column(name = "practice_location", length = 200)
+    private String practiceLocation;
 
     @Column(name = "scope_of_practice", columnDefinition = "TEXT")
     private String scopeOfPractice;
 
-    @Column(name = "facility_name", length = 200)
-    private String facilityName;
-
-    @Column(name = "facility_address", columnDefinition = "TEXT")
-    private String facilityAddress;
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "renewal_status", length = 20)
-    private LicenseRenewalStatus renewalStatus;
-
-    @Column(name = "renewal_reminder_sent")
-    private Boolean renewalReminderSent = false;
-
     @Column(name = "document_url", length = 500)
     private String documentUrl;
 
+    @Column(name = "verified", nullable = false)
+    private Boolean verified = false;
+
+    @Column(name = "verified_by")
+    private UUID verifiedBy;
+
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
+
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
-
-    @Column(name = "is_active", nullable = false)
-    private Boolean isActive = true;
 }

@@ -82,11 +82,10 @@ public class EmployeeDocumentService {
         document.setDescription(documentDetails.getDescription());
         document.setIssueDate(documentDetails.getIssueDate());
         document.setExpiryDate(documentDetails.getExpiryDate());
-        document.setIssuedBy(documentDetails.getIssuedBy());
         document.setFileUrl(documentDetails.getFileUrl());
         document.setFileName(documentDetails.getFileName());
-        document.setFileSize(documentDetails.getFileSize());
-        document.setMimeType(documentDetails.getMimeType());
+        document.setFileSizeBytes(documentDetails.getFileSizeBytes());
+        document.setFileType(documentDetails.getFileType());
         document.setNotes(documentDetails.getNotes());
 
         return employeeDocumentRepository.save(document);

@@ -44,7 +44,7 @@ public class EmployeeFamilyService {
 
     @Transactional(readOnly = true)
     public List<EmployeeFamily> getBpjsCoveredMembers(UUID employeeId) {
-        return employeeFamilyRepository.findByEmployeeIdAndIsBpjsCoveredTrue(employeeId);
+        return employeeFamilyRepository.findByEmployeeIdAndCoveredByHealthInsuranceTrue(employeeId);
     }
 
     @Transactional(readOnly = true)
@@ -72,7 +72,7 @@ public class EmployeeFamilyService {
         familyMember.setAddress(familyMemberDetails.getAddress());
         familyMember.setIsDependent(familyMemberDetails.getIsDependent());
         familyMember.setIsEmergencyContact(familyMemberDetails.getIsEmergencyContact());
-        familyMember.setIsBpjsCovered(familyMemberDetails.getIsBpjsCovered());
+        familyMember.setCoveredByHealthInsurance(familyMemberDetails.getCoveredByHealthInsurance());
         familyMember.setBpjsNumber(familyMemberDetails.getBpjsNumber());
         familyMember.setNotes(familyMemberDetails.getNotes());
 

@@ -16,25 +16,25 @@ import java.util.UUID;
 @Repository
 public interface ProfessionalLicenseRepository extends JpaRepository<ProfessionalLicense, UUID> {
 
-    List<ProfessionalLicense> findByEmployeeIdAndIsActiveTrue(UUID employeeId);
+    List<ProfessionalLicense> findByEmployeeId(UUID employeeId);
 
-    List<ProfessionalLicense> findByEmployeeIdAndLicenseTypeAndIsActiveTrue(UUID employeeId, LicenseType licenseType);
+    List<ProfessionalLicense> findByEmployeeIdAndLicenseType(UUID employeeId, LicenseType licenseType);
 
     Optional<ProfessionalLicense> findByLicenseNumber(String licenseNumber);
 
-    List<ProfessionalLicense> findByLicenseTypeAndIsActiveTrue(LicenseType licenseType);
+    List<ProfessionalLicense> findByLicenseType(LicenseType licenseType);
 
     List<ProfessionalLicense> findByRenewalStatus(LicenseRenewalStatus renewalStatus);
 
-    @Query("SELECT l FROM ProfessionalLicense l WHERE l.expiryDate BETWEEN :startDate AND :endDate AND l.isActive = true")
+    @Query("SELECT l FROM ProfessionalLicense l WHERE l.expiryDate BETWEEN :startDate AND :endDate")
     List<ProfessionalLicense> findExpiringBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT l FROM ProfessionalLicense l WHERE l.expiryDate < :date AND l.isActive = true")
+    @Query("SELECT l FROM ProfessionalLicense l WHERE l.expiryDate < :date")
     List<ProfessionalLicense> findExpiredLicenses(@Param("date") LocalDate date);
 
     @Query("SELECT l FROM ProfessionalLicense l WHERE l.renewalStatus = 'EXPIRING_SOON' AND l.renewalReminderSent = false")
     List<ProfessionalLicense> findLicensesNeedingReminder();
 
-    @Query("SELECT COUNT(l) FROM ProfessionalLicense l WHERE l.employeeId = :employeeId AND l.licenseType = :type AND l.isActive = true")
+    @Query("SELECT COUNT(l) FROM ProfessionalLicense l WHERE l.employeeId = :employeeId AND l.licenseType = :type AND l.isExpired = false")
     Long countActiveLicensesByEmployeeAndType(@Param("employeeId") UUID employeeId, @Param("type") LicenseType type);
 }

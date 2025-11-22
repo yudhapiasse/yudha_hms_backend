@@ -22,6 +22,7 @@ import java.util.UUID;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@Access(AccessType.FIELD)
 public class Employee extends SoftDeletableEntity {
 
     @Column(name = "employee_number", length = 50, nullable = false, unique = true)
@@ -104,9 +105,6 @@ public class Employee extends SoftDeletableEntity {
     @Column(name = "contract_end_date")
     private LocalDate contractEndDate;
 
-    @Column(name = "permanent_date")
-    private LocalDate permanentDate;
-
     @Column(name = "resignation_date")
     private LocalDate resignationDate;
 
@@ -116,11 +114,11 @@ public class Employee extends SoftDeletableEntity {
     @Column(name = "bank_account_number", length = 50)
     private String bankAccountNumber;
 
-    @Column(name = "bank_account_name", length = 200)
-    private String bankAccountName;
+    @Column(name = "bank_account_holder_name", length = 200)
+    private String bankAccountHolderName;
 
-    @Column(name = "base_salary", precision = 15, scale = 2)
-    private BigDecimal baseSalary;
+    @Column(name = "basic_salary", precision = 15, scale = 2)
+    private BigDecimal basicSalary;
 
     @Column(name = "emergency_contact_name", length = 200)
     private String emergencyContactName;
@@ -140,6 +138,6 @@ public class Employee extends SoftDeletableEntity {
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;
 
-    @Column(name = "is_active", nullable = false)
+    @Column(name = "active", nullable = false)
     private Boolean isActive = true;
 }

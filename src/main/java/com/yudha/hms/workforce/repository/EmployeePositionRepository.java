@@ -22,15 +22,15 @@ public interface EmployeePositionRepository extends JpaRepository<EmployeePositi
 
     List<EmployeePosition> findByPositionLevel(PositionLevel positionLevel);
 
-    List<EmployeePosition> findByRequiresStrTrueAndIsActiveTrue();
+    List<EmployeePosition> findByRequiresMedicalLicenseTrueAndIsActiveTrue();
 
-    List<EmployeePosition> findByRequiresSipTrueAndIsActiveTrue();
+    List<EmployeePosition> findByRequiresCertificationTrueAndIsActiveTrue();
 
     List<EmployeePosition> findByIsActiveTrue();
 
     @Query("SELECT p FROM EmployeePosition p WHERE p.departmentId = :departmentId AND p.positionLevel = :positionLevel AND p.isActive = true")
     List<EmployeePosition> findByDepartmentAndLevel(@Param("departmentId") UUID departmentId, @Param("positionLevel") PositionLevel positionLevel);
 
-    @Query("SELECT p FROM EmployeePosition p WHERE (p.requiresStr = true OR p.requiresSip = true) AND p.isActive = true")
+    @Query("SELECT p FROM EmployeePosition p WHERE (p.requiresMedicalLicense = true OR p.requiresCertification = true) AND p.isActive = true")
     List<EmployeePosition> findPositionsRequiringLicense();
 }

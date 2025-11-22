@@ -16,7 +16,7 @@ public interface EmployeeEducationRepository extends JpaRepository<EmployeeEduca
 
     List<EmployeeEducation> findByEmployeeId(UUID employeeId);
 
-    List<EmployeeEducation> findByEmployeeIdOrderByGraduationDateDesc(UUID employeeId);
+    List<EmployeeEducation> findByEmployeeIdOrderByGraduationYearDesc(UUID employeeId);
 
     Optional<EmployeeEducation> findByEmployeeIdAndIsHighestEducationTrue(UUID employeeId);
 
@@ -25,6 +25,6 @@ public interface EmployeeEducationRepository extends JpaRepository<EmployeeEduca
     @Query("SELECT e FROM EmployeeEducation e WHERE e.employeeId = :employeeId AND e.educationLevel = :level")
     List<EmployeeEducation> findByEmployeeAndLevel(@Param("employeeId") UUID employeeId, @Param("level") EducationLevel level);
 
-    @Query("SELECT e FROM EmployeeEducation e WHERE e.institutionName LIKE %:keyword% OR e.fieldOfStudy LIKE %:keyword%")
+    @Query("SELECT e FROM EmployeeEducation e WHERE e.institutionName LIKE %:keyword% OR e.majorFieldOfStudy LIKE %:keyword%")
     List<EmployeeEducation> searchByInstitutionOrField(@Param("keyword") String keyword);
 }

@@ -120,8 +120,8 @@ public class EmployeeService {
         employee.setEmploymentType(employeeDetails.getEmploymentType());
         employee.setBankName(employeeDetails.getBankName());
         employee.setBankAccountNumber(employeeDetails.getBankAccountNumber());
-        employee.setBankAccountName(employeeDetails.getBankAccountName());
-        employee.setBaseSalary(employeeDetails.getBaseSalary());
+        employee.setBankAccountHolderName(employeeDetails.getBankAccountHolderName());
+        employee.setBasicSalary(employeeDetails.getBasicSalary());
         employee.setEmergencyContactName(employeeDetails.getEmergencyContactName());
         employee.setEmergencyContactRelationship(employeeDetails.getEmergencyContactRelationship());
         employee.setEmergencyContactPhone(employeeDetails.getEmergencyContactPhone());
@@ -136,7 +136,7 @@ public class EmployeeService {
     public void promoteEmployeeToPermanent(UUID id, LocalDate permanentDate) {
         Employee employee = getEmployeeById(id);
         employee.setEmploymentStatus(EmploymentStatus.PERMANENT);
-        employee.setPermanentDate(permanentDate);
+        // permanentDate parameter is not used as the column doesn't exist in database
         employee.setContractEndDate(null);
         employeeRepository.save(employee);
     }

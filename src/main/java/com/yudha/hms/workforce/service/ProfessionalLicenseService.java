@@ -32,17 +32,17 @@ public class ProfessionalLicenseService {
 
     @Transactional(readOnly = true)
     public List<ProfessionalLicense> getLicensesByEmployee(UUID employeeId) {
-        return professionalLicenseRepository.findByEmployeeIdAndIsActiveTrue(employeeId);
+        return professionalLicenseRepository.findByEmployeeId(employeeId);
     }
 
     @Transactional(readOnly = true)
     public List<ProfessionalLicense> getLicensesByEmployeeAndType(UUID employeeId, LicenseType licenseType) {
-        return professionalLicenseRepository.findByEmployeeIdAndLicenseTypeAndIsActiveTrue(employeeId, licenseType);
+        return professionalLicenseRepository.findByEmployeeIdAndLicenseType(employeeId, licenseType);
     }
 
     @Transactional(readOnly = true)
     public List<ProfessionalLicense> getLicensesByType(LicenseType licenseType) {
-        return professionalLicenseRepository.findByLicenseTypeAndIsActiveTrue(licenseType);
+        return professionalLicenseRepository.findByLicenseType(licenseType);
     }
 
     @Transactional(readOnly = true)
@@ -74,8 +74,8 @@ public class ProfessionalLicenseService {
 
     @Transactional
     public ProfessionalLicense createLicense(ProfessionalLicense license) {
-        license.setIsActive(true);
         license.setRenewalReminderSent(false);
+        license.setIsExpired(false);
         updateRenewalStatus(license);
         return professionalLicenseRepository.save(license);
     }
@@ -89,11 +89,16 @@ public class ProfessionalLicenseService {
         license.setIssuedBy(licenseDetails.getIssuedBy());
         license.setIssueDate(licenseDetails.getIssueDate());
         license.setExpiryDate(licenseDetails.getExpiryDate());
+        license.setProfession(licenseDetails.getProfession());
         license.setSpecialization(licenseDetails.getSpecialization());
+        license.setPracticeLocation(licenseDetails.getPracticeLocation());
         license.setScopeOfPractice(licenseDetails.getScopeOfPractice());
-        license.setFacilityName(licenseDetails.getFacilityName());
-        license.setFacilityAddress(licenseDetails.getFacilityAddress());
         license.setDocumentUrl(licenseDetails.getDocumentUrl());
+        license.setVerified(licenseDetails.getVerified());
+        license.setVerifiedBy(licenseDetails.getVerifiedBy());
+        license.setVerifiedAt(licenseDetails.getVerifiedAt());
+        license.setIsExpired(licenseDetails.getIsExpired());
+        license.setLastReminderDate(licenseDetails.getLastReminderDate());
         license.setNotes(licenseDetails.getNotes());
 
         updateRenewalStatus(license);
@@ -119,16 +124,18 @@ public class ProfessionalLicenseService {
     }
 
     @Transactional
-    public void deactivateLicense(UUID id) {
+    public void markAsExpired(UUID id) {
         ProfessionalLicense license = getLicenseById(id);
-        license.setIsActive(false);
+        license.setIsExpired(true);
+        license.setRenewalStatus(LicenseRenewalStatus.EXPIRED);
         professionalLicenseRepository.save(license);
     }
 
     @Transactional
-    public void activateLicense(UUID id) {
+    public void markAsValid(UUID id) {
         ProfessionalLicense license = getLicenseById(id);
-        license.setIsActive(true);
+        license.setIsExpired(false);
+        updateRenewalStatus(license);
         professionalLicenseRepository.save(license);
     }
 

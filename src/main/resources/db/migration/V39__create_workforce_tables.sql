@@ -1,6 +1,50 @@
 -- V39: Workforce Management - Employee Master Data
 -- Phase 12.1: Comprehensive employee management for Indonesian hospital
 
+-- Create workforce schema if it doesn't exist
+CREATE SCHEMA IF NOT EXISTS workforce_schema;
+
+-- Employee position/job title table (must be created BEFORE employee table)
+CREATE TABLE workforce_schema.employee_position (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    created_by VARCHAR(100),
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_by VARCHAR(100),
+    deleted_at TIMESTAMP,
+    deleted_by VARCHAR(100),
+    version BIGINT NOT NULL DEFAULT 0,
+
+    position_code VARCHAR(50) NOT NULL UNIQUE,
+    position_name VARCHAR(200) NOT NULL,
+    position_name_id VARCHAR(200) NOT NULL, -- Indonesian name
+    position_level VARCHAR(30), -- STAFF, SUPERVISOR, MANAGER, DIRECTOR
+    department_id UUID,
+    parent_position_id UUID, -- For hierarchy
+
+    -- Job description
+    job_description TEXT,
+    responsibilities TEXT,
+    requirements TEXT,
+    qualifications TEXT,
+
+    -- Professional requirements
+    requires_medical_license BOOLEAN DEFAULT false,
+    required_license_type VARCHAR(50), -- STR, SIP, etc.
+    requires_certification BOOLEAN DEFAULT false,
+    required_certifications TEXT[],
+
+    -- Employment
+    min_experience_years INTEGER,
+    min_education_level VARCHAR(30),
+
+    active BOOLEAN DEFAULT true,
+    notes TEXT,
+
+    CONSTRAINT fk_position_department FOREIGN KEY (department_id) REFERENCES master_schema.department(id),
+    CONSTRAINT fk_position_parent FOREIGN KEY (parent_position_id) REFERENCES workforce_schema.employee_position(id)
+);
+
 -- Employee master table
 CREATE TABLE workforce_schema.employee (
     -- Primary key and audit fields inherited from soft_deletable pattern
@@ -96,49 +140,8 @@ CREATE TABLE workforce_schema.employee (
     notes TEXT,
 
     -- Indexes for performance
-    CONSTRAINT fk_employee_department FOREIGN KEY (department_id) REFERENCES shared_schema.department(id),
+    CONSTRAINT fk_employee_department FOREIGN KEY (department_id) REFERENCES master_schema.department(id),
     CONSTRAINT fk_employee_position FOREIGN KEY (position_id) REFERENCES workforce_schema.employee_position(id)
-);
-
--- Employee position/job title table
-CREATE TABLE workforce_schema.employee_position (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    created_by VARCHAR(100),
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_by VARCHAR(100),
-    deleted_at TIMESTAMP,
-    deleted_by VARCHAR(100),
-    version BIGINT NOT NULL DEFAULT 0,
-
-    position_code VARCHAR(50) NOT NULL UNIQUE,
-    position_name VARCHAR(200) NOT NULL,
-    position_name_id VARCHAR(200) NOT NULL, -- Indonesian name
-    position_level VARCHAR(30), -- STAFF, SUPERVISOR, MANAGER, DIRECTOR
-    department_id UUID,
-    parent_position_id UUID, -- For hierarchy
-    
-    -- Job description
-    job_description TEXT,
-    responsibilities TEXT,
-    requirements TEXT,
-    qualifications TEXT,
-
-    -- Professional requirements
-    requires_medical_license BOOLEAN DEFAULT false,
-    required_license_type VARCHAR(50), -- STR, SIP, etc.
-    requires_certification BOOLEAN DEFAULT false,
-    required_certifications TEXT[],
-
-    -- Employment
-    min_experience_years INTEGER,
-    min_education_level VARCHAR(30),
-
-    active BOOLEAN DEFAULT true,
-    notes TEXT,
-
-    CONSTRAINT fk_position_department FOREIGN KEY (department_id) REFERENCES shared_schema.department(id),
-    CONSTRAINT fk_position_parent FOREIGN KEY (parent_position_id) REFERENCES workforce_schema.employee_position(id)
 );
 
 -- Professional licenses (STR, SIP, etc.)

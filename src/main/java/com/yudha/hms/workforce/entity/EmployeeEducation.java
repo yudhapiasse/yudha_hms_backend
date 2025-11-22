@@ -9,7 +9,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -24,47 +23,47 @@ public class EmployeeEducation extends SoftDeletableEntity {
     private UUID employeeId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "education_level", length = 20, nullable = false)
+    @Column(name = "education_level", length = 30, nullable = false)
     private EducationLevel educationLevel;
 
     @Column(name = "institution_name", length = 200, nullable = false)
     private String institutionName;
 
-    @Column(name = "field_of_study", length = 200)
-    private String fieldOfStudy;
+    @Column(name = "major_field_of_study", length = 200)
+    private String majorFieldOfStudy;
 
-    @Column(name = "major", length = 200)
-    private String major;
+    @Column(name = "degree_title", length = 100)
+    private String degreeTitle;
 
-    @Column(name = "start_date")
-    private LocalDate startDate;
+    @Column(name = "start_year")
+    private Integer startYear;
 
-    @Column(name = "end_date")
-    private LocalDate endDate;
+    @Column(name = "graduation_year", nullable = false)
+    private Integer graduationYear;
 
-    @Column(name = "graduation_date")
-    private LocalDate graduationDate;
-
-    @Column(name = "gpa", precision = 3, scale = 2)
+    @Column(name = "gpa", precision = 4, scale = 2)
     private BigDecimal gpa;
 
-    @Column(name = "gpa_scale", precision = 3, scale = 2)
+    @Column(name = "gpa_scale", precision = 4, scale = 2)
     private BigDecimal gpaScale;
+
+    @Column(name = "country", length = 50)
+    private String country;
+
+    @Column(name = "city", length = 100)
+    private String city;
 
     @Column(name = "certificate_number", length = 100)
     private String certificateNumber;
 
-    @Column(name = "accreditation", length = 10)
-    private String accreditation;
-
-    @Column(name = "document_url", length = 500)
-    private String documentUrl;
-
-    @Column(name = "transcript_url", length = 500)
-    private String transcriptUrl;
+    @Column(name = "certificate_url", length = 500)
+    private String certificateUrl;
 
     @Column(name = "is_highest_education", nullable = false)
     private Boolean isHighestEducation = false;
+
+    @Column(name = "verified", nullable = false)
+    private Boolean isVerified = false;
 
     @Column(name = "notes", columnDefinition = "TEXT")
     private String notes;

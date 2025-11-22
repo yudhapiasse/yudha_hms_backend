@@ -21,11 +21,11 @@ public interface EmployeeFamilyRepository extends JpaRepository<EmployeeFamily, 
 
     List<EmployeeFamily> findByEmployeeIdAndIsEmergencyContactTrue(UUID employeeId);
 
-    List<EmployeeFamily> findByEmployeeIdAndIsBpjsCoveredTrue(UUID employeeId);
+    List<EmployeeFamily> findByEmployeeIdAndCoveredByHealthInsuranceTrue(UUID employeeId);
 
     @Query("SELECT f FROM EmployeeFamily f WHERE f.employeeId = :employeeId AND f.isDependent = true")
     List<EmployeeFamily> findDependentsByEmployee(@Param("employeeId") UUID employeeId);
 
-    @Query("SELECT COUNT(f) FROM EmployeeFamily f WHERE f.employeeId = :employeeId AND f.isBpjsCovered = true")
+    @Query("SELECT COUNT(f) FROM EmployeeFamily f WHERE f.employeeId = :employeeId AND f.coveredByHealthInsurance = true")
     Long countBpjsCoveredMembers(@Param("employeeId") UUID employeeId);
 }

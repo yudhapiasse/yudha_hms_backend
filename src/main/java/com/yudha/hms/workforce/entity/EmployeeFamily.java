@@ -58,8 +58,8 @@ public class EmployeeFamily extends SoftDeletableEntity {
     @Column(name = "is_emergency_contact", nullable = false)
     private Boolean isEmergencyContact = false;
 
-    @Column(name = "is_bpjs_covered", nullable = false)
-    private Boolean isBpjsCovered = false;
+    @Column(name = "covered_by_health_insurance", nullable = false)
+    private Boolean coveredByHealthInsurance = false;
 
     @Column(name = "bpjs_number", length = 20)
     private String bpjsNumber;

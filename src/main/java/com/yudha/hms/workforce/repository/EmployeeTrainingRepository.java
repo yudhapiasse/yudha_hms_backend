@@ -32,9 +32,6 @@ public interface EmployeeTrainingRepository extends JpaRepository<EmployeeTraini
     @Query("SELECT t FROM EmployeeTraining t WHERE t.certificateExpiryDate BETWEEN :startDate AND :endDate")
     List<EmployeeTraining> findCertificatesExpiringBetween(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT SUM(t.skpCredits) FROM EmployeeTraining t WHERE t.employeeId = :employeeId AND t.completionStatus = 'COMPLETED' AND t.startDate >= :fromDate")
-    BigDecimal sumSkpCreditsByEmployeeSinceDate(@Param("employeeId") UUID employeeId, @Param("fromDate") LocalDate fromDate);
-
     @Query("SELECT COUNT(t) FROM EmployeeTraining t WHERE t.employeeId = :employeeId AND t.completionStatus = 'COMPLETED'")
     Long countCompletedTrainingsByEmployee(@Param("employeeId") UUID employeeId);
 }

@@ -49,13 +49,13 @@ public class EmployeePositionService {
     }
 
     @Transactional(readOnly = true)
-    public List<EmployeePosition> getPositionsRequiringSTR() {
-        return employeePositionRepository.findByRequiresStrTrueAndIsActiveTrue();
+    public List<EmployeePosition> getPositionsRequiringMedicalLicense() {
+        return employeePositionRepository.findByRequiresMedicalLicenseTrueAndIsActiveTrue();
     }
 
     @Transactional(readOnly = true)
-    public List<EmployeePosition> getPositionsRequiringSIP() {
-        return employeePositionRepository.findByRequiresSipTrueAndIsActiveTrue();
+    public List<EmployeePosition> getPositionsRequiringCertification() {
+        return employeePositionRepository.findByRequiresCertificationTrueAndIsActiveTrue();
     }
 
     @Transactional(readOnly = true)
@@ -78,11 +78,17 @@ public class EmployeePositionService {
         position.setDepartmentId(positionDetails.getDepartmentId());
         position.setParentPositionId(positionDetails.getParentPositionId());
         position.setPositionLevel(positionDetails.getPositionLevel());
-        position.setRequiresStr(positionDetails.getRequiresStr());
-        position.setRequiresSip(positionDetails.getRequiresSip());
-        position.setMinEducationLevel(positionDetails.getMinEducationLevel());
         position.setJobDescription(positionDetails.getJobDescription());
-        position.setJobDescriptionId(positionDetails.getJobDescriptionId());
+        position.setResponsibilities(positionDetails.getResponsibilities());
+        position.setRequirements(positionDetails.getRequirements());
+        position.setQualifications(positionDetails.getQualifications());
+        position.setRequiresMedicalLicense(positionDetails.getRequiresMedicalLicense());
+        position.setRequiredLicenseType(positionDetails.getRequiredLicenseType());
+        position.setRequiresCertification(positionDetails.getRequiresCertification());
+        position.setRequiredCertifications(positionDetails.getRequiredCertifications());
+        position.setMinExperienceYears(positionDetails.getMinExperienceYears());
+        position.setMinEducationLevel(positionDetails.getMinEducationLevel());
+        position.setNotes(positionDetails.getNotes());
 
         return employeePositionRepository.save(position);
     }

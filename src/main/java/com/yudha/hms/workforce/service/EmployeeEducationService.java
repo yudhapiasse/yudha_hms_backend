@@ -24,7 +24,7 @@ public class EmployeeEducationService {
 
     @Transactional(readOnly = true)
     public List<EmployeeEducation> getEducationByEmployee(UUID employeeId) {
-        return employeeEducationRepository.findByEmployeeIdOrderByGraduationDateDesc(employeeId);
+        return employeeEducationRepository.findByEmployeeIdOrderByGraduationYearDesc(employeeId);
     }
 
     @Transactional(readOnly = true)
@@ -61,18 +61,18 @@ public class EmployeeEducationService {
 
         education.setEducationLevel(educationDetails.getEducationLevel());
         education.setInstitutionName(educationDetails.getInstitutionName());
-        education.setFieldOfStudy(educationDetails.getFieldOfStudy());
-        education.setMajor(educationDetails.getMajor());
-        education.setStartDate(educationDetails.getStartDate());
-        education.setEndDate(educationDetails.getEndDate());
-        education.setGraduationDate(educationDetails.getGraduationDate());
+        education.setMajorFieldOfStudy(educationDetails.getMajorFieldOfStudy());
+        education.setDegreeTitle(educationDetails.getDegreeTitle());
+        education.setStartYear(educationDetails.getStartYear());
+        education.setGraduationYear(educationDetails.getGraduationYear());
         education.setGpa(educationDetails.getGpa());
         education.setGpaScale(educationDetails.getGpaScale());
+        education.setCountry(educationDetails.getCountry());
+        education.setCity(educationDetails.getCity());
         education.setCertificateNumber(educationDetails.getCertificateNumber());
-        education.setAccreditation(educationDetails.getAccreditation());
-        education.setDocumentUrl(educationDetails.getDocumentUrl());
-        education.setTranscriptUrl(educationDetails.getTranscriptUrl());
+        education.setCertificateUrl(educationDetails.getCertificateUrl());
         education.setIsHighestEducation(educationDetails.getIsHighestEducation());
+        education.setIsVerified(educationDetails.getIsVerified());
         education.setNotes(educationDetails.getNotes());
 
         return employeeEducationRepository.save(education);

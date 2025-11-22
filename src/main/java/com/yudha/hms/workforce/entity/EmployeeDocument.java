@@ -41,22 +41,19 @@ public class EmployeeDocument extends SoftDeletableEntity {
     @Column(name = "expiry_date")
     private LocalDate expiryDate;
 
-    @Column(name = "issued_by", length = 200)
-    private String issuedBy;
-
     @Column(name = "file_url", length = 500, nullable = false)
     private String fileUrl;
 
     @Column(name = "file_name", length = 200)
     private String fileName;
 
-    @Column(name = "file_size")
-    private Long fileSize;
+    @Column(name = "file_size_bytes")
+    private Long fileSizeBytes;
 
-    @Column(name = "mime_type", length = 100)
-    private String mimeType;
+    @Column(name = "file_type", length = 50)
+    private String fileType;
 
-    @Column(name = "is_verified", nullable = false)
+    @Column(name = "verified", nullable = false)
     private Boolean isVerified = false;
 
     @Column(name = "verified_by")
