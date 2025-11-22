@@ -120,6 +120,16 @@ public class Employee extends SoftDeletableEntity {
     @Column(name = "basic_salary", precision = 15, scale = 2)
     private BigDecimal basicSalary;
 
+    // Payroll-related fields
+    @Column(name = "ptkp_status", length = 10)
+    private String ptkpStatus = "TK/0";  // Default: Single, no dependents
+
+    @Column(name = "has_family", nullable = false)
+    private Boolean hasFamily = false;
+
+    @Column(name = "number_of_dependents")
+    private Integer numberOfDependents = 0;
+
     @Column(name = "emergency_contact_name", length = 200)
     private String emergencyContactName;
 
@@ -140,4 +150,9 @@ public class Employee extends SoftDeletableEntity {
 
     @Column(name = "active", nullable = false)
     private Boolean isActive = true;
+
+    // Helper method for payroll calculations
+    public LocalDate getEmploymentStartDate() {
+        return this.joinDate;
+    }
 }

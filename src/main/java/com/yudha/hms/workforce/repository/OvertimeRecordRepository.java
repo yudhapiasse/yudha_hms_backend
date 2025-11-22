@@ -35,6 +35,12 @@ public interface OvertimeRecordRepository extends JpaRepository<OvertimeRecord, 
     @Query("SELECT SUM(or.effectiveOvertimeHours) FROM OvertimeRecord or WHERE or.employeeId = :employeeId AND or.overtimeDate BETWEEN :startDate AND :endDate AND or.status = 'APPROVED'")
     BigDecimal sumApprovedOvertimeHours(@Param("employeeId") UUID employeeId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
+    @Query("SELECT or FROM OvertimeRecord or WHERE or.employeeId = :employeeId AND or.overtimeDate BETWEEN :startDate AND :endDate AND or.status = 'APPROVED'")
+    List<OvertimeRecord> findApprovedOvertimeByEmployeeAndPeriod(@Param("employeeId") UUID employeeId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT COALESCE(SUM(or.effectiveOvertimeHours), 0) FROM OvertimeRecord or WHERE or.employeeId = :employeeId AND or.overtimeDate BETWEEN :startDate AND :endDate")
+    BigDecimal getTotalOvertimeHoursByEmployeeAndDateRange(@Param("employeeId") UUID employeeId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
     @Query("SELECT or FROM OvertimeRecord or WHERE or.supervisorId = :supervisorId AND or.supervisorApproved = false AND or.status = 'PENDING'")
     List<OvertimeRecord> findPendingForSupervisor(@Param("supervisorId") UUID supervisorId);
 

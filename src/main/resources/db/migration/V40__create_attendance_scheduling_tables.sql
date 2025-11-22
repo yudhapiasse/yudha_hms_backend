@@ -6,7 +6,7 @@
 CREATE SCHEMA IF NOT EXISTS workforce_schema;
 
 -- Shift pattern master table
-CREATE TABLE workforce_schema.shift_pattern (
+CREATE TABLE IF NOT EXISTS workforce_schema.shift_pattern (
     -- Primary key and audit fields
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -54,7 +54,7 @@ CREATE TABLE workforce_schema.shift_pattern (
 );
 
 -- Shift group/rotation pattern
-CREATE TABLE workforce_schema.shift_rotation (
+CREATE TABLE IF NOT EXISTS workforce_schema.shift_rotation (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -80,7 +80,7 @@ CREATE TABLE workforce_schema.shift_rotation (
 );
 
 -- Shift rotation details (defines the pattern)
-CREATE TABLE workforce_schema.shift_rotation_detail (
+CREATE TABLE IF NOT EXISTS workforce_schema.shift_rotation_detail (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -102,7 +102,7 @@ CREATE TABLE workforce_schema.shift_rotation_detail (
 );
 
 -- Employee shift assignment (which rotation/pattern an employee follows)
-CREATE TABLE workforce_schema.employee_shift_assignment (
+CREATE TABLE IF NOT EXISTS workforce_schema.employee_shift_assignment (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -133,7 +133,7 @@ CREATE TABLE workforce_schema.employee_shift_assignment (
 );
 
 -- Duty roster (actual schedule for each employee per day)
-CREATE TABLE workforce_schema.duty_roster (
+CREATE TABLE IF NOT EXISTS workforce_schema.duty_roster (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -179,7 +179,7 @@ CREATE TABLE workforce_schema.duty_roster (
 );
 
 -- Public holidays (Indonesian holidays)
-CREATE TABLE workforce_schema.public_holiday (
+CREATE TABLE IF NOT EXISTS workforce_schema.public_holiday (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -219,7 +219,7 @@ CREATE TABLE workforce_schema.public_holiday (
 );
 
 -- Attendance records
-CREATE TABLE workforce_schema.attendance_record (
+CREATE TABLE IF NOT EXISTS workforce_schema.attendance_record (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -289,7 +289,7 @@ CREATE TABLE workforce_schema.attendance_record (
 );
 
 -- Leave types master
-CREATE TABLE workforce_schema.leave_type (
+CREATE TABLE IF NOT EXISTS workforce_schema.leave_type (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -343,7 +343,7 @@ CREATE TABLE workforce_schema.leave_type (
 );
 
 -- Leave balance tracking
-CREATE TABLE workforce_schema.leave_balance (
+CREATE TABLE IF NOT EXISTS workforce_schema.leave_balance (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -381,7 +381,7 @@ CREATE TABLE workforce_schema.leave_balance (
 );
 
 -- Leave requests
-CREATE TABLE workforce_schema.leave_request (
+CREATE TABLE IF NOT EXISTS workforce_schema.leave_request (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -458,7 +458,7 @@ CREATE TABLE workforce_schema.leave_request (
 );
 
 -- On-call schedule (for doctors and critical staff)
-CREATE TABLE workforce_schema.on_call_schedule (
+CREATE TABLE IF NOT EXISTS workforce_schema.on_call_schedule (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -510,7 +510,7 @@ CREATE TABLE workforce_schema.on_call_schedule (
 );
 
 -- Shift substitution/replacement
-CREATE TABLE workforce_schema.shift_substitution (
+CREATE TABLE IF NOT EXISTS workforce_schema.shift_substitution (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -568,7 +568,7 @@ CREATE TABLE workforce_schema.shift_substitution (
 );
 
 -- Overtime records
-CREATE TABLE workforce_schema.overtime_record (
+CREATE TABLE IF NOT EXISTS workforce_schema.overtime_record (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -645,7 +645,7 @@ CREATE TABLE workforce_schema.overtime_record (
 );
 
 -- Attendance summary (monthly aggregation for reporting)
-CREATE TABLE workforce_schema.attendance_summary (
+CREATE TABLE IF NOT EXISTS workforce_schema.attendance_summary (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_by VARCHAR(100),
@@ -702,50 +702,50 @@ CREATE TABLE workforce_schema.attendance_summary (
 );
 
 -- Create indexes for performance
-CREATE INDEX idx_shift_pattern_code ON workforce_schema.shift_pattern(shift_code);
-CREATE INDEX idx_shift_pattern_type ON workforce_schema.shift_pattern(shift_type);
-CREATE INDEX idx_shift_pattern_dept ON workforce_schema.shift_pattern(department_id);
+CREATE INDEX IF NOT EXISTS idx_shift_pattern_code ON workforce_schema.shift_pattern(shift_code);
+CREATE INDEX IF NOT EXISTS idx_shift_pattern_type ON workforce_schema.shift_pattern(shift_type);
+CREATE INDEX IF NOT EXISTS idx_shift_pattern_dept ON workforce_schema.shift_pattern(department_id);
 
-CREATE INDEX idx_roster_employee ON workforce_schema.duty_roster(employee_id);
-CREATE INDEX idx_roster_date ON workforce_schema.duty_roster(roster_date);
-CREATE INDEX idx_roster_dept ON workforce_schema.duty_roster(department_id);
-CREATE INDEX idx_roster_status ON workforce_schema.duty_roster(status);
-CREATE INDEX idx_roster_employee_date ON workforce_schema.duty_roster(employee_id, roster_date);
+CREATE INDEX IF NOT EXISTS idx_roster_employee ON workforce_schema.duty_roster(employee_id);
+CREATE INDEX IF NOT EXISTS idx_roster_date ON workforce_schema.duty_roster(roster_date);
+CREATE INDEX IF NOT EXISTS idx_roster_dept ON workforce_schema.duty_roster(department_id);
+CREATE INDEX IF NOT EXISTS idx_roster_status ON workforce_schema.duty_roster(status);
+CREATE INDEX IF NOT EXISTS idx_roster_employee_date ON workforce_schema.duty_roster(employee_id, roster_date);
 
-CREATE INDEX idx_holiday_date ON workforce_schema.public_holiday(holiday_date);
-CREATE INDEX idx_holiday_year ON workforce_schema.public_holiday(year);
-CREATE INDEX idx_holiday_type ON workforce_schema.public_holiday(holiday_type);
+CREATE INDEX IF NOT EXISTS idx_holiday_date ON workforce_schema.public_holiday(holiday_date);
+CREATE INDEX IF NOT EXISTS idx_holiday_year ON workforce_schema.public_holiday(year);
+CREATE INDEX IF NOT EXISTS idx_holiday_type ON workforce_schema.public_holiday(holiday_type);
 
-CREATE INDEX idx_attendance_employee ON workforce_schema.attendance_record(employee_id);
-CREATE INDEX idx_attendance_date ON workforce_schema.attendance_record(attendance_date);
-CREATE INDEX idx_attendance_status ON workforce_schema.attendance_record(attendance_status);
-CREATE INDEX idx_attendance_employee_date ON workforce_schema.attendance_record(employee_id, attendance_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_employee ON workforce_schema.attendance_record(employee_id);
+CREATE INDEX IF NOT EXISTS idx_attendance_date ON workforce_schema.attendance_record(attendance_date);
+CREATE INDEX IF NOT EXISTS idx_attendance_status ON workforce_schema.attendance_record(attendance_status);
+CREATE INDEX IF NOT EXISTS idx_attendance_employee_date ON workforce_schema.attendance_record(employee_id, attendance_date);
 
-CREATE INDEX idx_leave_type_code ON workforce_schema.leave_type(leave_code);
-CREATE INDEX idx_leave_type_category ON workforce_schema.leave_type(leave_category);
+CREATE INDEX IF NOT EXISTS idx_leave_type_code ON workforce_schema.leave_type(leave_code);
+CREATE INDEX IF NOT EXISTS idx_leave_type_category ON workforce_schema.leave_type(leave_category);
 
-CREATE INDEX idx_leave_balance_employee ON workforce_schema.leave_balance(employee_id);
-CREATE INDEX idx_leave_balance_year ON workforce_schema.leave_balance(balance_year);
+CREATE INDEX IF NOT EXISTS idx_leave_balance_employee ON workforce_schema.leave_balance(employee_id);
+CREATE INDEX IF NOT EXISTS idx_leave_balance_year ON workforce_schema.leave_balance(balance_year);
 
-CREATE INDEX idx_leave_request_number ON workforce_schema.leave_request(request_number);
-CREATE INDEX idx_leave_request_employee ON workforce_schema.leave_request(employee_id);
-CREATE INDEX idx_leave_request_status ON workforce_schema.leave_request(status);
-CREATE INDEX idx_leave_request_dates ON workforce_schema.leave_request(start_date, end_date);
+CREATE INDEX IF NOT EXISTS idx_leave_request_number ON workforce_schema.leave_request(request_number);
+CREATE INDEX IF NOT EXISTS idx_leave_request_employee ON workforce_schema.leave_request(employee_id);
+CREATE INDEX IF NOT EXISTS idx_leave_request_status ON workforce_schema.leave_request(status);
+CREATE INDEX IF NOT EXISTS idx_leave_request_dates ON workforce_schema.leave_request(start_date, end_date);
 
-CREATE INDEX idx_oncall_employee ON workforce_schema.on_call_schedule(employee_id);
-CREATE INDEX idx_oncall_date ON workforce_schema.on_call_schedule(on_call_date);
-CREATE INDEX idx_oncall_dept ON workforce_schema.on_call_schedule(department_id);
+CREATE INDEX IF NOT EXISTS idx_oncall_employee ON workforce_schema.on_call_schedule(employee_id);
+CREATE INDEX IF NOT EXISTS idx_oncall_date ON workforce_schema.on_call_schedule(on_call_date);
+CREATE INDEX IF NOT EXISTS idx_oncall_dept ON workforce_schema.on_call_schedule(department_id);
 
-CREATE INDEX idx_substitution_number ON workforce_schema.shift_substitution(request_number);
-CREATE INDEX idx_substitution_original_emp ON workforce_schema.shift_substitution(original_employee_id);
-CREATE INDEX idx_substitution_substitute_emp ON workforce_schema.shift_substitution(substitute_employee_id);
-CREATE INDEX idx_substitution_status ON workforce_schema.shift_substitution(status);
+CREATE INDEX IF NOT EXISTS idx_substitution_number ON workforce_schema.shift_substitution(request_number);
+CREATE INDEX IF NOT EXISTS idx_substitution_original_emp ON workforce_schema.shift_substitution(original_employee_id);
+CREATE INDEX IF NOT EXISTS idx_substitution_substitute_emp ON workforce_schema.shift_substitution(substitute_employee_id);
+CREATE INDEX IF NOT EXISTS idx_substitution_status ON workforce_schema.shift_substitution(status);
 
-CREATE INDEX idx_overtime_number ON workforce_schema.overtime_record(overtime_number);
-CREATE INDEX idx_overtime_employee ON workforce_schema.overtime_record(employee_id);
-CREATE INDEX idx_overtime_date ON workforce_schema.overtime_record(overtime_date);
-CREATE INDEX idx_overtime_status ON workforce_schema.overtime_record(status);
+CREATE INDEX IF NOT EXISTS idx_overtime_number ON workforce_schema.overtime_record(overtime_number);
+CREATE INDEX IF NOT EXISTS idx_overtime_employee ON workforce_schema.overtime_record(employee_id);
+CREATE INDEX IF NOT EXISTS idx_overtime_date ON workforce_schema.overtime_record(overtime_date);
+CREATE INDEX IF NOT EXISTS idx_overtime_status ON workforce_schema.overtime_record(status);
 
-CREATE INDEX idx_summary_employee ON workforce_schema.attendance_summary(employee_id);
-CREATE INDEX idx_summary_year_month ON workforce_schema.attendance_summary(summary_year, summary_month);
-CREATE INDEX idx_summary_dept ON workforce_schema.attendance_summary(department_id);
+CREATE INDEX IF NOT EXISTS idx_summary_employee ON workforce_schema.attendance_summary(employee_id);
+CREATE INDEX IF NOT EXISTS idx_summary_year_month ON workforce_schema.attendance_summary(summary_year, summary_month);
+CREATE INDEX IF NOT EXISTS idx_summary_dept ON workforce_schema.attendance_summary(department_id);
